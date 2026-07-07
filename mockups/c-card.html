@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 C · Product / Model-Card</title>
+<style>
+:root{
+  --bg:#f7f7f9; --card:#ffffff; --soft:#f1f1f5; --line:#e7e7ec;
+  --tx:#16161d; --tx-2:#5b5b66; --tx-3:#9494a0;
+  --ac:#6366f1; --ac-2:#818cf8; --ac-weak:#6366f114; --pos:#16a34a; --neg:#e05a4a; --amber:#d97706;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Inter,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --sh:0 1px 2px rgba(20,20,40,.04),0 4px 16px rgba(20,20,40,.05); --r:14px; --r2:10px;
+}
+*{box-sizing:border-box;} html,body{margin:0;height:100%;}
+body{background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:14.5px;line-height:1.65;-webkit-font-smoothing:antialiased;}
+a{color:var(--ac);text-decoration:none;} code{font-family:var(--mono);font-size:.88em;background:var(--soft);padding:1px 5px;border-radius:5px;}
+.top{display:flex;align-items:center;gap:20px;height:56px;padding:0 22px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.01em;}
+.brand::before{content:"";width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--ac),var(--ac-2));}
+.top nav{display:flex;gap:2px;} .top nav a{color:var(--tx-2);font-size:14px;padding:7px 12px;border-radius:9px;font-weight:500;}
+.top nav a.on{color:var(--ac);background:var(--ac-weak);} .top .r{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--tx-3);font-size:13.5px;}
+.wrap{display:grid;grid-template-columns:248px 1fr;}
+.side{padding:18px 12px;height:calc(100vh - 56px);position:sticky;top:56px;overflow:auto;border-right:1px solid var(--line);}
+.side .h{font-weight:700;font-size:14.5px;padding:6px 10px 12px;}
+.side .g{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--tx-3);font-weight:700;margin:16px 0 6px;padding:0 10px;}
+.side a{display:flex;align-items:center;gap:9px;color:var(--tx-2);font-size:14px;padding:7px 10px;border-radius:9px;}
+.side a:hover{background:var(--soft);} .side a.on{color:var(--ac);background:var(--ac-weak);font-weight:600;}
+.dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--tx-3);} .dot.run{background:var(--amber);} .side a.mut{color:var(--tx-3);} .side a.mut .dot{background:var(--line);}
+.main{padding:26px 30px 90px;max-width:1000px;}
+.crumb{font-size:13px;color:var(--tx-3);margin-bottom:14px;}
+/* model-card header */
+.card-head{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px 24px;box-shadow:var(--sh);}
+.ch-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+h1{font-size:24px;letter-spacing:-.02em;margin:0;}
+.badge{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;background:#d9770618;color:var(--amber);}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 0;}
+.chip{font-size:12px;color:var(--tx-2);background:var(--soft);padding:4px 10px;border-radius:999px;}
+.chip.ac{background:var(--ac-weak);color:var(--ac);font-weight:600;}
+.dek{color:var(--tx-2);margin:14px 0 0;max-width:70ch;}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:18px;}
+.kpi{background:var(--soft);border-radius:var(--r2);padding:12px 14px;}
+.kpi .v{font-size:20px;font-weight:750;letter-spacing:-.01em;font-family:var(--mono);} .kpi.wait .v{color:var(--tx-3);} .kpi .l{color:var(--tx-3);font-size:12px;}
+/* tabs */
+.tabs{display:flex;gap:2px;margin:22px 0 4px;border-bottom:1px solid var(--line);}
+.tabs a{padding:10px 14px;font-size:14px;color:var(--tx-2);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tabs a.on{color:var(--ac);border-bottom-color:var(--ac);font-weight:600;}
+/* cards */
+.sec{margin:22px 0;}
+.sec h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;box-shadow:var(--sh);}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+figure{margin:0;text-align:center;} figure svg{max-width:100%;height:auto;} figcaption{color:var(--tx-3);font-size:12.5px;margin-top:10px;}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
+.spec .s{background:var(--soft);border-radius:var(--r2);padding:11px 13px;} .spec .s .k{color:var(--tx-3);font-size:11.5px;} .spec .s .v{font-family:var(--mono);font-size:13.5px;margin-top:2px;}
+.callout{display:flex;gap:10px;background:var(--ac-weak);border-radius:var(--r2);padding:12px 14px;margin-top:14px;color:var(--tx-2);font-size:13.5px;}
+.rw{display:grid;grid-template-columns:130px 1fr 54px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--soft);} .rw:last-child{border:none;}
+.rw .nm{font-family:var(--mono);font-size:12.5px;} .rbar{height:7px;background:var(--soft);border-radius:99px;position:relative;overflow:hidden;} .rbar i{position:absolute;left:0;top:0;height:100%;border-radius:99px;}
+.rbar i.p{background:var(--pos);} .rbar i.n{background:var(--neg);} .w{font-family:var(--mono);text-align:right;font-weight:700;font-size:13px;} .w.p{color:var(--pos);} .w.n{color:var(--neg);}
+.result{border:1.5px dashed var(--line);border-radius:var(--r);padding:30px;text-align:center;color:var(--tx-3);font-size:13.5px;}
+.nd{fill:var(--card);stroke:var(--ac);stroke-width:1.4;} .nd.io{fill:var(--ac-weak);stroke:var(--ac);stroke-width:1.8;}
+.eg{stroke:var(--ac);opacity:.2;} .lb{fill:var(--tx);font:600 13px var(--sans);} .sb{fill:var(--tx-3);font:11px var(--sans);}
+.ar{stroke:var(--tx-2);stroke-width:1.5;fill:none;} .mk{fill:var(--tx-2);}
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="brand">Robot Learning Dashboard</span>
+  <nav><a class="on">Locomotion</a><a>Fall</a><a>Dance</a><a>Manipulation</a><a>Loco-Manip</a></nav>
+  <span class="r">Guidance&nbsp;·&nbsp;☾</span>
+</header>
+<div class="wrap">
+  <aside class="side">
+    <div class="h">Locomotion 行走</div>
+    <div class="g">平地行走</div>
+    <a class="on"><span class="dot run"></span>Hello Cartpole</a><a class="mut"><span class="dot"></span>Ant 四足行走</a><a class="mut"><span class="dot"></span>G1 平地行走</a>
+    <div class="g">地形行走</div><a class="mut"><span class="dot"></span>G1 崎岖地形</a>
+    <div class="g">楼梯行走</div><a class="mut"><span class="dot"></span>G1 上下楼梯</a>
+    <div class="g">后续环节</div><a class="mut"><span class="dot"></span>Sim2Sim</a><a class="mut"><span class="dot"></span>师生蒸馏</a><a class="mut"><span class="dot"></span>导航 + ANIMA</a>
+  </aside>
+
+  <main class="main">
+    <div class="crumb">任务 › Locomotion › Hello Cartpole</div>
+    <div class="card-head">
+      <div class="ch-top"><h1>Hello Cartpole</h1><span class="badge">训练中</span></div>
+      <div class="chips"><span class="chip ac">RL · PPO</span><span class="chip">Cartpole</span><span class="chip">Isaac-Cartpole-v0</span><span class="chip">Manager-based</span><span class="chip">2026-07-06</span></div>
+      <p class="dek">Isaac Lab 倒立摆小车。几分钟收敛，用它把一个 PPO 训练循环从头到尾看透——细到用什么激活函数单元。所有数字取自真实 cfg。</p>
+      <div class="kpis">
+        <div class="kpi wait"><div class="v">—</div><div class="l">最终奖励 · 待训练</div></div>
+        <div class="kpi"><div class="v">4096</div><div class="l">并行环境</div></div>
+        <div class="kpi"><div class="v">150</div><div class="l">迭代</div></div>
+        <div class="kpi"><div class="v">4 / 1</div><div class="l">观测 / 动作</div></div>
+        <div class="kpi"><div class="v">[32,32]</div><div class="l">网络 · ELU</div></div>
+      </div>
+    </div>
+
+    <div class="tabs"><a class="on">概览</a><a>网络结构</a><a>观测 &amp; 动作</a><a>奖励 &amp; 策略</a><a>训练配置</a><a>结果</a></div>
+
+    <div class="sec">
+      <div class="card"><figure>
+        <svg viewBox="0 0 820 206" role="img" aria-label="RL 闭环">
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>
+          <rect class="nd io" x="70" y="56" rx="14" width="240" height="92"/>
+          <text class="lb" x="190" y="96" text-anchor="middle">策略 π · Actor</text><text class="sb" x="190" y="118" text-anchor="middle">MLP 4→32→32→1 · ELU</text>
+          <rect class="nd" x="510" y="56" rx="14" width="240" height="92"/>
+          <text class="lb" x="630" y="96" text-anchor="middle">环境</text><text class="sb" x="630" y="118" text-anchor="middle">Isaac-Cartpole-v0</text>
+          <path class="ar" d="M310 90 H505" marker-end="url(#ah)"/><text class="sb" x="408" y="78" text-anchor="middle">动作 a · 1维（对小车施力）</text>
+          <path class="ar" d="M510 124 H315" marker-end="url(#ah)"/><text class="sb" x="408" y="144" text-anchor="middle">观测 s · 4维 ＋ 奖励 r · 5项</text>
+        </svg><figcaption>强化学习闭环：策略施力 → 环境返回新观测与奖励 → 策略朝多拿分调。</figcaption>
+      </figure></div>
+    </div>
+
+    <div class="sec"><h2>训练对象 · 网络</h2>
+      <div class="card"><figure>
+        <svg viewBox="0 0 720 200" role="img" aria-label="Actor 网络">
+          <g class="eg">
+            <line x1="130" y1="42" x2="300" y2="32"/><line x1="130" y1="42" x2="300" y2="80"/><line x1="130" y1="42" x2="300" y2="128"/><line x1="130" y1="42" x2="300" y2="168"/>
+            <line x1="130" y1="86" x2="300" y2="32"/><line x1="130" y1="86" x2="300" y2="80"/><line x1="130" y1="86" x2="300" y2="128"/><line x1="130" y1="86" x2="300" y2="168"/>
+            <line x1="130" y1="130" x2="300" y2="32"/><line x1="130" y1="130" x2="300" y2="80"/><line x1="130" y1="130" x2="300" y2="128"/><line x1="130" y1="130" x2="300" y2="168"/>
+            <line x1="130" y1="172" x2="300" y2="80"/><line x1="130" y1="172" x2="300" y2="128"/><line x1="130" y1="172" x2="300" y2="168"/>
+            <line x1="300" y1="32" x2="470" y2="32"/><line x1="300" y1="80" x2="470" y2="80"/><line x1="300" y1="128" x2="470" y2="128"/><line x1="300" y1="168" x2="470" y2="168"/>
+            <line x1="470" y1="32" x2="600" y2="100"/><line x1="470" y1="80" x2="600" y2="100"/><line x1="470" y1="128" x2="600" y2="100"/><line x1="470" y1="168" x2="600" y2="100"/>
+          </g>
+          <circle class="nd io" cx="130" cy="42" r="9"/><circle class="nd io" cx="130" cy="86" r="9"/><circle class="nd io" cx="130" cy="130" r="9"/><circle class="nd io" cx="130" cy="172" r="9"/>
+          <circle class="nd" cx="300" cy="32" r="8"/><circle class="nd" cx="300" cy="80" r="8"/><circle class="nd" cx="300" cy="128" r="8"/><circle class="nd" cx="300" cy="168" r="8"/>
+          <circle class="nd" cx="470" cy="32" r="8"/><circle class="nd" cx="470" cy="80" r="8"/><circle class="nd" cx="470" cy="128" r="8"/><circle class="nd" cx="470" cy="168" r="8"/>
+          <circle class="nd io" cx="600" cy="100" r="10"/>
+          <text class="sb" x="108" y="46" text-anchor="end">小车位置</text><text class="sb" x="108" y="90" text-anchor="end">杆角度</text><text class="sb" x="108" y="134" text-anchor="end">小车速度</text><text class="sb" x="108" y="176" text-anchor="end">杆角速度</text>
+          <text class="sb" x="130" y="196" text-anchor="middle">观测 4</text><text class="sb" x="300" y="196" text-anchor="middle">32·ELU</text><text class="sb" x="470" y="196" text-anchor="middle">32·ELU</text><text class="sb" x="600" y="196" text-anchor="middle">动作 1</text>
+        </svg><figcaption>Actor 4→32→32→1；Critic 同构，输出价值 V(s)。</figcaption></figure>
+        <div class="callout">🧠 隐藏层 ELU（平滑不"神经元死亡"）· init_noise_std 1.0 · 无观测归一化 · Critic 只训练时用。</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="sec"><h2>奖励 · 策略</h2><div class="card">
+        <div class="rw"><span class="nm">alive</span><span class="rbar"><i class="p" style="width:70%"></i></span><span class="w p">+1.0</span></div>
+        <div class="rw"><span class="nm">terminating</span><span class="rbar"><i class="n" style="width:100%"></i></span><span class="w n">−2.0</span></div>
+        <div class="rw"><span class="nm">pole_pos</span><span class="rbar"><i class="n" style="width:70%"></i></span><span class="w n">−1.0</span></div>
+        <div class="rw"><span class="nm">cart_vel</span><span class="rbar"><i class="n" style="width:14%"></i></span><span class="w n">−0.01</span></div>
+        <div class="rw"><span class="nm">pole_vel</span><span class="rbar"><i class="n" style="width:10%"></i></span><span class="w n">−0.005</span></div>
+      </div></div>
+      <div class="sec"><h2>训练配置</h2><div class="card"><div class="spec">
+        <div class="s"><div class="k">rollout</div><div class="v">4096 × 16</div></div>
+        <div class="s"><div class="k">clip</div><div class="v">0.2</div></div>
+        <div class="s"><div class="k">γ / λ</div><div class="v">0.99 / 0.95</div></div>
+        <div class="s"><div class="k">lr</div><div class="v">1e-3 adaptive</div></div>
+        <div class="s"><div class="k">epochs×batch</div><div class="v">5 × 4</div></div>
+        <div class="s"><div class="k">优化器</div><div class="v">Adam</div></div>
+      </div></div></div>
+    </div>
+
+    <div class="sec"><h2>结果</h2><div class="result">⏳ 训练曲线待导出 · mean_reward 上扬 / Loss/value 收敛 / 5 项奖励各一条</div></div>
+  </main>
+</div>
+</body>
+</html>

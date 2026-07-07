@@ -1,0 +1,18 @@
+# ── OS / 编辑器垃圾 ──
+.DS_Store
+Thumbs.db
+*~
+*.swp
+.idea/
+.vscode/
+
+# ── Python ──
+__pycache__/
+*.pyc
+
+# ── 私有区（agent 工作笔记，永不入库）──
+CLAUDE.md
+.claude/
+
+# 注意：data/**/*.js（曲线数据）、assets/vendor/（vendored plotly）必须入库，
+# 站点离线运行依赖它们，切勿在此忽略。

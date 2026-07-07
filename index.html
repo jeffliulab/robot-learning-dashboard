@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Learning Dashboard</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<header class="top">
+  <button class="menu-btn" aria-label="菜单">☰</button>
+  <a class="brand" href="#/">Robot Learning Dashboard</a>
+  <nav class="topnav" id="topnav"></nav>
+  <div class="r">
+    <button class="theme-toggle" title="切换深浅主题" aria-label="切换深浅主题">☾</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="side" id="sidebar"></aside>
+  <main>
+    <div class="art">
+      <div id="view"></div>
+      <footer style="margin-top:56px;padding-top:20px;border-top:1px solid var(--rule);color:var(--ink-3);font-size:13px">
+        Robot Learning Dashboard · <a href="https://github.com/jeffliulab/robot-learning-dashboard">GitHub</a> · MIT © 2026 Jeff Liu
+      </footer>
+    </div>
+  </main>
+  <aside class="toc" id="toc"></aside>
+</div>
+
+<script src="assets/vendor/plotly/plotly-basic.min.js"></script>
+<script src="data/manifest.js"></script>
+<script src="data/locomotion/cartpole-balance-2026-07-06_08-00-30.js"></script>
+<script src="data/locomotion/ant-walk-2026-07-07_08-19-22_base-s42.js"></script>
+<script src="data/locomotion/ant-walk-seeds-compare.js"></script>
+<script src="data/locomotion/ant-walk-ablation-compare.js"></script>
+<script src="content/views.js"></script>
+<script src="assets/charts.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

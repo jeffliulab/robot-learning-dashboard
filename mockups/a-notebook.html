@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 A · Lab Notebook</title>
+<style>
+:root{
+  --paper:#fbfaf7; --paper-2:#f4f1ea; --card:#ffffff; --ink:#221f1a; --ink-2:#5b564d; --ink-3:#8b8579;
+  --rule:#e6e1d6; --accent:#b4531f; --accent-2:#1f4d8f; --pos:#2f7d5b; --neg:#b4432a;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Times New Roman",Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;} html,body{margin:0;height:100%;}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased;}
+a{color:var(--accent-2);text-decoration:none;} a:hover{text-decoration:underline;}
+code{font-family:var(--mono);font-size:.88em;background:var(--paper-2);padding:1px 5px;border-radius:4px;}
+/* top bar */
+.top{display:flex;align-items:center;gap:22px;height:60px;padding:0 26px;border-bottom:1px solid var(--rule);background:var(--paper);}
+.brand{font-family:var(--serif);font-weight:700;font-size:19px;letter-spacing:.01em;}
+.top nav{display:flex;gap:20px;} .top nav a{color:var(--ink-2);font-size:14.5px;}
+.top nav a.on{color:var(--ink);border-bottom:2px solid var(--accent);padding-bottom:3px;}
+.top .r{margin-left:auto;color:var(--ink-3);font-size:14px;}
+.wrap{display:grid;grid-template-columns:240px 1fr;}
+/* sidebar */
+.side{border-right:1px solid var(--rule);padding:26px 18px;height:calc(100vh - 60px);position:sticky;top:60px;overflow:auto;}
+.side .h{font-family:var(--serif);font-size:16px;margin:0 0 14px;}
+.side .g{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:18px 0 7px;}
+.side a{display:block;color:var(--ink-2);font-size:14px;padding:5px 8px;border-radius:6px;}
+.side a:hover{background:var(--paper-2);text-decoration:none;}
+.side a.on{color:var(--accent);font-weight:600;border-left:2px solid var(--accent);padding-left:10px;border-radius:0;}
+.side a.mut{color:var(--ink-3);}
+/* article */
+.art{max-width:860px;margin:0 auto;padding:44px 40px 100px;}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);}
+h1{font-family:var(--serif);font-size:40px;line-height:1.15;letter-spacing:-.01em;margin:8px 0 6px;}
+.dek{font-size:18px;color:var(--ink-2);margin:0 0 22px;max-width:64ch;}
+.meta{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.tag{font-family:var(--mono);font-size:12px;color:var(--ink-2);background:var(--paper-2);padding:3px 9px;border-radius:4px;}
+.tag.hot{color:var(--accent);background:#b4531f14;}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;border:1px solid var(--rule);border-radius:8px;margin:22px 0;overflow:hidden;}
+.kpis .k{padding:14px 16px;border-right:1px solid var(--rule);}
+.kpis .k:last-child{border-right:none;}
+.kpis .k .v{font-family:var(--serif);font-size:24px;} .kpis .k .l{font-size:12px;color:var(--ink-3);}
+h2{font-family:var(--serif);font-size:26px;margin:46px 0 10px;padding-top:8px;}
+h2 .n{color:var(--accent);font-size:18px;margin-right:8px;font-family:var(--mono);}
+p{margin:12px 0;}
+figure{margin:26px 0;text-align:center;}
+figure svg{max-width:100%;height:auto;}
+figcaption{font-size:13.5px;color:var(--ink-3);font-style:italic;margin-top:12px;font-family:var(--serif);}
+.note{border-left:3px solid var(--accent);background:#b4531f0a;padding:12px 18px;margin:18px 0;font-size:15px;color:var(--ink-2);}
+.note b{color:var(--ink);}
+.rewards{margin:18px 0;}
+.rw{display:grid;grid-template-columns:150px 1fr 56px;gap:14px;align-items:center;padding:9px 0;border-bottom:1px dotted var(--rule);}
+.rw .nm{font-family:var(--mono);font-size:13px;}
+.rw .bar{height:6px;background:var(--paper-2);border-radius:3px;position:relative;}
+.rw .bar i{position:absolute;left:0;top:0;height:100%;border-radius:3px;}
+.rw .bar i.p{background:var(--pos);} .rw .bar i.n{background:var(--neg);}
+.rw .w{font-family:var(--serif);text-align:right;font-size:15px;} .rw .w.p{color:var(--pos);} .rw .w.n{color:var(--neg);}
+.hp{columns:2;column-gap:34px;font-size:14.5px;margin:14px 0;}
+.hp div{break-inside:avoid;padding:5px 0;border-bottom:1px dotted var(--rule);display:flex;justify-content:space-between;}
+.hp .k{color:var(--ink-2);} .hp .v{font-family:var(--mono);}
+.result{border:1px dashed var(--rule);border-radius:8px;padding:34px;text-align:center;color:var(--ink-3);font-size:14px;background:var(--paper-2);}
+/* svg theme */
+.nd{fill:var(--card);stroke:var(--ink);stroke-width:1.5;} .nd.io{fill:#b4531f14;stroke:var(--accent);}
+.eg{stroke:var(--ink-3);opacity:.3;} .lb{fill:var(--ink-2);font:600 13px var(--sans);} .sb{fill:var(--ink-3);font:12px var(--sans);}
+.ar{stroke:var(--ink);stroke-width:1.6;fill:none;} .mk{fill:var(--ink);}
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="brand">Robot Learning Dashboard</span>
+  <nav><a class="on">Locomotion</a><a>Fall</a><a>Dance</a><a>Manipulation</a><a>Loco-Manip</a></nav>
+  <span class="r">Guidance ・ ☾</span>
+</header>
+<div class="wrap">
+  <aside class="side">
+    <div class="h">Locomotion 行走</div>
+    <div class="g">平地行走</div>
+    <a class="on">Hello Cartpole</a><a class="mut">Ant 四足行走</a><a class="mut">G1 平地行走</a>
+    <div class="g">地形行走</div><a class="mut">G1 崎岖地形</a>
+    <div class="g">楼梯行走</div><a class="mut">G1 上下楼梯</a>
+    <div class="g">后续环节</div><a class="mut">Sim2Sim・蒸馏・导航</a>
+  </aside>
+
+  <article class="art">
+    <div class="kicker">实验 01 · 强化学习</div>
+    <h1>Hello Cartpole</h1>
+    <p class="dek">Isaac Lab 自带的倒立摆小车（<code>Isaac-Cartpole-v0</code>）。几分钟收敛，我们用它把一个 PPO 训练循环从头到尾看透——细到用什么激活函数单元。</p>
+    <div class="meta"><span class="tag hot">训练中</span><span class="tag">Cartpole</span><span class="tag">PPO · RL</span><span class="tag">Manager-based</span><span class="tag">2026-07-06</span></div>
+
+    <div class="kpis">
+      <div class="k"><div class="v">4096</div><div class="l">并行环境</div></div>
+      <div class="k"><div class="v">150</div><div class="l">迭代</div></div>
+      <div class="k"><div class="v">4 / 1</div><div class="l">观测 / 动作</div></div>
+      <div class="k"><div class="v">[32,32]</div><div class="l">网络 · ELU</div></div>
+      <div class="k"><div class="v">Adam</div><div class="l">优化器</div></div>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 820 232" role="img" aria-label="强化学习闭环">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>
+        <rect class="nd io" x="70" y="66" rx="14" width="240" height="100"/>
+        <text class="lb" x="190" y="104" text-anchor="middle">策略 π · Actor（会学的）</text>
+        <text class="sb" x="190" y="128" text-anchor="middle">MLP 4→32→32→1 · ELU</text>
+        <rect class="nd" x="510" y="66" rx="14" width="240" height="100"/>
+        <text class="lb" x="630" y="104" text-anchor="middle">环境（给真相）</text>
+        <text class="sb" x="630" y="128" text-anchor="middle">Isaac-Cartpole-v0</text>
+        <path class="ar" d="M310 100 H505" marker-end="url(#ah)"/>
+        <text class="sb" x="408" y="88" text-anchor="middle">动作 a · 1维（对小车施力）</text>
+        <path class="ar" d="M510 138 H315" marker-end="url(#ah)"/>
+        <text class="sb" x="408" y="158" text-anchor="middle">观测 s · 4维　＋　奖励 r · 5项</text>
+      </svg>
+      <figcaption>图 1 · 强化学习就是策略与环境的一个闭环：策略施力，环境返回新观测和奖励，策略朝"多拿分"调。</figcaption>
+    </figure>
+
+    <h2><span class="n">01</span>训练对象：两个神经网络</h2>
+    <p>训练在调的不是机器人，是<b>神经网络的权重</b>。这里是标准的 Actor-Critic：两个都是朴素的多层全连接网络（MLP）。下图是 Actor——4 维观测进、两层各 32 个 ELU 神经元、出 1 维动作。</p>
+    <figure>
+      <svg viewBox="0 0 720 220" role="img" aria-label="Actor 网络">
+        <g class="eg">
+          <line x1="130" y1="50" x2="300" y2="40"/><line x1="130" y1="50" x2="300" y2="90"/><line x1="130" y1="50" x2="300" y2="140"/><line x1="130" y1="50" x2="300" y2="180"/>
+          <line x1="130" y1="97" x2="300" y2="40"/><line x1="130" y1="97" x2="300" y2="90"/><line x1="130" y1="97" x2="300" y2="140"/><line x1="130" y1="97" x2="300" y2="180"/>
+          <line x1="130" y1="144" x2="300" y2="40"/><line x1="130" y1="144" x2="300" y2="90"/><line x1="130" y1="144" x2="300" y2="140"/><line x1="130" y1="144" x2="300" y2="180"/>
+          <line x1="130" y1="191" x2="300" y2="90"/><line x1="130" y1="191" x2="300" y2="140"/><line x1="130" y1="191" x2="300" y2="180"/>
+          <line x1="300" y1="40" x2="470" y2="40"/><line x1="300" y1="90" x2="470" y2="90"/><line x1="300" y1="140" x2="470" y2="140"/><line x1="300" y1="180" x2="470" y2="180"/>
+          <line x1="470" y1="40" x2="600" y2="110"/><line x1="470" y1="90" x2="600" y2="110"/><line x1="470" y1="140" x2="600" y2="110"/><line x1="470" y1="180" x2="600" y2="110"/>
+        </g>
+        <g>
+          <circle class="nd io" cx="130" cy="50" r="9"/><circle class="nd io" cx="130" cy="97" r="9"/><circle class="nd io" cx="130" cy="144" r="9"/><circle class="nd io" cx="130" cy="191" r="9"/>
+          <circle class="nd" cx="300" cy="40" r="8"/><circle class="nd" cx="300" cy="90" r="8"/><circle class="nd" cx="300" cy="140" r="8"/><circle class="nd" cx="300" cy="180" r="8"/>
+          <circle class="nd" cx="470" cy="40" r="8"/><circle class="nd" cx="470" cy="90" r="8"/><circle class="nd" cx="470" cy="140" r="8"/><circle class="nd" cx="470" cy="180" r="8"/>
+          <circle class="nd io" cx="600" cy="110" r="10"/>
+        </g>
+        <text class="sb" x="106" y="54" text-anchor="end">小车位置</text><text class="sb" x="106" y="101" text-anchor="end">杆角度</text>
+        <text class="sb" x="106" y="148" text-anchor="end">小车速度</text><text class="sb" x="106" y="195" text-anchor="end">杆角速度</text>
+        <text class="sb" x="130" y="214" text-anchor="middle">观测 4</text><text class="sb" x="300" y="214" text-anchor="middle">32 · ELU</text>
+        <text class="sb" x="470" y="214" text-anchor="middle">32 · ELU</text><text class="sb" x="600" y="214" text-anchor="middle">动作 1</text>
+      </svg>
+      <figcaption>图 2 · Actor 策略网络 4→32→32→1。Critic 价值网络结构相同，只是输出换成标量价值 V(s)。</figcaption>
+    </figure>
+    <div class="note"><b>为什么用 ELU？</b> 负半区平滑不砍零，不会"神经元死亡"、动作更平顺——这是腿足控制社区的经验默认。详见 Guidance。</div>
+
+    <h2><span class="n">02</span>策略：奖励函数</h2>
+    <p>"设定策略"的本质就是这几条打分规则。条越长权重越大，绿加分、红扣分：</p>
+    <div class="rewards">
+      <div class="rw"><span class="nm">alive</span><span class="bar"><i class="p" style="width:70%"></i></span><span class="w p">+1.0</span></div>
+      <div class="rw"><span class="nm">terminating</span><span class="bar"><i class="n" style="width:100%"></i></span><span class="w n">−2.0</span></div>
+      <div class="rw"><span class="nm">pole_pos</span><span class="bar"><i class="n" style="width:70%"></i></span><span class="w n">−1.0</span></div>
+      <div class="rw"><span class="nm">cart_vel</span><span class="bar"><i class="n" style="width:14%"></i></span><span class="w n">−0.01</span></div>
+      <div class="rw"><span class="nm">pole_vel</span><span class="bar"><i class="n" style="width:10%"></i></span><span class="w n">−0.005</span></div>
+    </div>
+
+    <h2><span class="n">03</span>训练配置</h2>
+    <div class="hp">
+      <div><span class="k">clip</span><span class="v">0.2</span></div><div><span class="k">γ</span><span class="v">0.99</span></div>
+      <div><span class="k">GAE λ</span><span class="v">0.95</span></div><div><span class="k">entropy</span><span class="v">0.005</span></div>
+      <div><span class="k">lr</span><span class="v">1e-3 adaptive</span></div><div><span class="k">epochs×batch</span><span class="v">5 × 4</span></div>
+      <div><span class="k">rollout</span><span class="v">4096 × 16</span></div><div><span class="k">迭代</span><span class="v">150</span></div>
+    </div>
+
+    <h2><span class="n">04</span>结果</h2>
+    <div class="result">⏳ 训练曲线待导出 · mean_reward 上扬 / Loss/value 收敛 / 5 项奖励各一条</div>
+  </article>
+</div>
+</body>
+</html>
