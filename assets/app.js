@@ -153,7 +153,10 @@
       var a = h("a", { href: "#" + hd.id, title: label, class: isSub ? "sub" : "" }, [label]);
       a.addEventListener("click", function (ev) {
         ev.preventDefault();               // 防止改写路由 hash
-        hd.scrollIntoView({ behavior: "smooth", block: "start" });
+        /* 瞬时跳转而非 smooth：长报告一页可达 2 万 px，平滑滚动的动画途中
+           被任何布局变化或用户滚动打断就会中途停下、到不了目标；
+           瞬时跳转配合媒体固定占位（img/video 实测宽高），保证一次到位。 */
+        hd.scrollIntoView({ block: "start" });
       });
       toc.appendChild(a);
       tocHeads.push({ head: hd, link: a });
@@ -219,6 +222,36 @@
     var mb = document.querySelector(".menu-btn"); if (mb) mb.addEventListener("click", function () { document.body.classList.toggle("sb-open"); });
   }
 
+  /* ---------- 图放大浮窗（lightbox）----------
+     正文 <figure> 直接子级的 SVG（示意图类）点击放大：SVG 矢量无损，正合适。
+     选择器必须是 figure > svg（直接子元素）——plotly 曲线图的 svg 嵌在多层 div 里，
+     天然被排除；曲线自带悬浮/框选交互，绝不能被 lightbox 劫持点击。
+     事件委托绑在 document 上，路由重渲染后依然有效。 */
+  function initLightbox() {
+    var box = null;
+    function close() {
+      if (!box) return;
+      box.parentNode && box.parentNode.removeChild(box);
+      box = null;
+      document.body.style.overflow = "";
+    }
+    document.addEventListener("click", function (ev) {
+      if (box) return;                                  // 浮窗打开期间由浮窗自己处理
+      var t = ev.target;
+      var svg = t && t.closest ? t.closest("figure > svg") : null;
+      if (!svg || !svg.closest("#view")) return;        // 只作用于正文示意图
+      var fig = svg.closest("figure");
+      var cap = fig ? fig.querySelector("figcaption") : null;
+      var inner = h("div", { class: "lightbox-inner" }, [svg.cloneNode(true)]);
+      if (cap) inner.appendChild(h("div", { class: "lightbox-cap", html: cap.innerHTML }));
+      box = h("div", { class: "lightbox", role: "dialog", "aria-label": "放大查看图片" }, [inner]);
+      box.addEventListener("click", close);             // 点任意处关闭
+      document.body.appendChild(box);
+      document.body.style.overflow = "hidden";          // 锁背景滚动
+    });
+    document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") close(); });
+  }
+
   /* 开发期一致性校验：done/running 实验必须有对应的 RL_CONTENT 内容块，缺失即警告（防改名静默断链） */
   function validateKeys() {
     tasks.forEach(function (t) {
@@ -229,5 +262,5 @@
     });
   }
 
-  document.addEventListener("DOMContentLoaded", function () { buildTopnav(); initChrome(); validateKeys(); render(); window.addEventListener("hashchange", render); });
+  document.addEventListener("DOMContentLoaded", function () { buildTopnav(); initChrome(); initLightbox(); validateKeys(); render(); window.addEventListener("hashchange", render); });
 })();

@@ -112,6 +112,18 @@ figcaption{font-family:var(--serif);font-style:italic;font-size:13.5px;color:var
 .eg{stroke:var(--ink-3);opacity:.32;} .lb{fill:var(--ink);font:600 13px var(--sans);} .sb{fill:var(--ink-3);font:12px var(--sans);}
 .ar{stroke:var(--ink);stroke-width:1.6;fill:none;} .mk{fill:var(--ink);}
 .vb{stroke:var(--ink-2);stroke-width:1.6;fill:none;}   /* 向量方括号 */
+/* 网络架构图（RLNet 组件，viewBox 1180 宽）：画布比普通示意图宽，字号补偿一档，缩略状态仍可读 */
+svg.net .lb{font-size:16px;} svg.net .sb{font-size:14px;}
+
+/* ---------- 图放大浮窗（lightbox）：正文示意图 SVG 点击放大 ---------- */
+figure > svg{cursor:zoom-in;}
+.lightbox{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  padding:28px;cursor:zoom-out;background:color-mix(in srgb,var(--paper) 86%,transparent);backdrop-filter:blur(7px);}
+.lightbox-inner{max-width:min(94vw,1400px);max-height:92vh;overflow:auto;text-align:center;}
+.lightbox-inner svg{width:min(94vw,1400px);height:auto;background:var(--card);
+  border:1px solid var(--rule);border-radius:12px;padding:26px;}
+.lightbox-cap{font-family:var(--serif);font-style:italic;font-size:14.5px;color:var(--ink-2);
+  margin:12px auto 0;max-width:84ch;}
 
 /* ---------- 正文排版 ---------- */
 .note{border-left:3px solid var(--accent);background:var(--accent-weak);padding:12px 18px;margin:18px 0;font-size:15px;color:var(--ink-2);border-radius:0 6px 6px 0;}
@@ -159,7 +171,11 @@ figcaption{font-family:var(--serif);font-style:italic;font-size:13.5px;color:var
 
 /* 回放帧序列（图 7） */
 .frames{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 4px;}
-.frames img{width:100%;display:block;border:1px solid var(--rule);border-radius:6px;}
+.frames img{width:100%;height:auto;display:block;border:1px solid var(--rule);border-radius:6px;}
+/* 媒体占位稳定：img/video 标签必须带实测 width/height 属性（见报告模板），
+   配合 height:auto 让浏览器按纵横比预留高度——否则媒体加载完成会把下方内容
+   顶移，TOC 长距离跳转就会落空。 */
+#view video{height:auto;}
 .frames .frame-t{display:block;font-size:12.5px;color:var(--ink-3);margin-top:5px;text-align:center;font-family:var(--mono);}
 @media (max-width:700px){ .frames{grid-template-columns:1fr;} }
 

@@ -52,84 +52,37 @@ function cartpoleSVG() {
     '<defs><marker id="mkF" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' +
     s + "</svg>";
 }
-/* ---------- SVG：MLP 层块式架构图（Actor / Critic 两用；配置驱动）----------
- * cfg = { kind:"actor"|"critic", aria, inItems:[分量/分组名...], inLabel:"观测 s ∈ ℝⁿ",
- *         blocks:[{x,w,l1,l2}...], dims:["ℝⁿ",...](块间维度流,含首末),
- *         outActor:{main,sub}, outCritic:{main,sub}, markerId }
- * 布局显式给出（blocks 的 x/w），保证既有页面零回归；新任务自带一套布局。 */
-function mlpSVG(cfg) {
-  var isActor = cfg.kind !== "critic";
-  var W = 820, H = 220, midY = 104;
-  var s = "";
-
-  /* 输入向量：方括号 + 分量/分组名 + 记号 */
-  var vx = 60, vTop = 40, vBot = 168, vW = 96;
-  var n = cfg.inItems.length, span = vBot - vTop - 24, step = n > 1 ? span / (n - 1) : 0;
-  s += '<path class="vb" d="M' + vx + " " + vTop + " h-10 v" + (vBot - vTop) + " h10" + '"/>';
-  s += '<path class="vb" d="M' + (vx + vW) + " " + vTop + " h10 v" + (vBot - vTop) + " h-10" + '"/>';
-  cfg.inItems.forEach(function (o, i) {
-    s += '<text class="sb" x="' + (vx + vW / 2) + '" y="' + (vTop + 24 + i * (n === 4 ? 30 : step)) + '" text-anchor="middle">' + o + "</text>";
-  });
-  s += '<text class="lb" x="' + (vx + vW / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + cfg.inLabel + "</text>";
-
-  cfg.blocks.forEach(function (b) {
-    s += '<rect class="nd io" x="' + b.x + '" y="' + (midY - 34) + '" rx="10" width="' + b.w + '" height="68"/>';
-    s += '<text class="lb" x="' + (b.x + b.w / 2) + '" y="' + (midY - 2) + '" text-anchor="middle">' + b.l1 + "</text>";
-    s += '<text class="sb" x="' + (b.x + b.w / 2) + '" y="' + (midY + 22) + '" text-anchor="middle">' + b.l2 + "</text>";
-  });
-
-  /* 箭头 + 维度流标注：入口 → 各块间 → 出口 */
-  var mid = cfg.markerId || "mkArr";
-  function arrow(x1, x2, dim) {
-    s += '<path class="ar" d="M' + x1 + " " + midY + " H" + (x2 - 5) + '" marker-end="url(#' + mid + ')"/>';
-    if (dim) s += '<text class="sb" x="' + ((x1 + x2) / 2) + '" y="' + (midY - 12) + '" text-anchor="middle">' + dim + "</text>";
-  }
-  arrow(vx + vW + 12, cfg.blocks[0].x, cfg.dims[0]);
-  for (var i = 0; i < cfg.blocks.length - 1; i++) {
-    arrow(cfg.blocks[i].x + cfg.blocks[i].w, cfg.blocks[i + 1].x, cfg.dims[i + 1]);
-  }
-  var last = cfg.blocks[cfg.blocks.length - 1];
-  arrow(last.x + last.w, 790, cfg.dims[cfg.dims.length - 1]);
-
-  var out = isActor ? cfg.outActor : cfg.outCritic;
-  s += '<text class="lb" x="765" y="' + (midY + 32) + '" text-anchor="middle">' + out.main + "</text>";
-  s += '<text class="sb" x="765" y="' + (midY + 52) + '" text-anchor="middle">' + out.sub + "</text>";
-
-  return '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + (isActor ? "Actor" : "Critic") + " " + cfg.aria + '">' +
-    '<defs><marker id="' + mid + '" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' +
-    s + "</svg>";
-}
-/* ---------- Cartpole 网络图配置（图 3 / 图 4；布局 = 定稿原值，零回归）---------- */
+/* ---------- 网络架构图：统一走 assets/net-diagram.js 的 RLNet.svg(cfg) ----------
+ * 本文件只写各实验的网络配置（层序列 + 输出头），排版与参数量计算都在组件里。
+ * 注意：Actor 与 Critic 的隐藏层同构，但末层输出维不同（Actor=动作维，Critic=1），
+ * 各自的层序列要分开给，参数量才能与正文"实测自检查点"数字吻合。 */
 function cartpoleMlpCfg(kind) {
+  var actor = kind !== "critic";
   return {
-    kind: kind, aria: "网络架构（Cartpole）", markerId: "mkArrCp",
-    inItems: ["小车位置", "杆角度", "小车速度", "杆角速度"],
-    inLabel: "观测 s ∈ ℝ⁴",
-    blocks: [
-      { x: 236, w: 140, l1: "FC 4→32", l2: "ELU" },
-      { x: 428, w: 140, l1: "FC 32→32", l2: "ELU" },
-      { x: 620, w: 120, l1: "FC 32→1", l2: "线性" }
+    aria: (actor ? "Actor" : "Critic") + " 网络架构（Cartpole）",
+    markerId: actor ? "mkNetCpA" : "mkNetCpC",
+    input: { label: "观测 s ∈ ℝ⁴", items: ["小车位置", "杆角度", "小车速度", "杆角速度"] },
+    layers: [
+      { type: "fc", in: 4, out: 32, act: "ELU" },
+      { type: "fc", in: 32, out: 32, act: "ELU" },
+      { type: "fc", in: 32, out: 1, act: "线性" }
     ],
-    dims: ["ℝ⁴", "ℝ³²", "ℝ³²", "ℝ¹"],
-    outActor: { main: "a ∈ ℝ¹", sub: "动作均值" },
-    outCritic: { main: "V(s) ∈ ℝ", sub: "状态价值" }
+    head: actor ? { type: "gaussian", dim: 1 } : { type: "value" }
   };
 }
-/* ---------- Ant 网络图配置（60→400→200→100→8；4 个层块紧凑布局）---------- */
 function antMlpCfg(kind) {
+  var actor = kind !== "critic";
   return {
-    kind: kind, aria: "网络架构（Ant）", markerId: "mkArrAnt",
-    inItems: ["躯干状态 ·12", "关节状态 ·16", "足端力 ·24", "上步动作 ·8"],
-    inLabel: "观测 s ∈ ℝ⁶⁰",
-    blocks: [
-      { x: 208, w: 122, l1: "FC 60→400", l2: "ELU" },
-      { x: 366, w: 122, l1: "FC 400→200", l2: "ELU" },
-      { x: 524, w: 122, l1: "FC 200→100", l2: "ELU" },
-      { x: 682, w: 96, l1: "FC 100→8", l2: "线性" }
+    aria: (actor ? "Actor" : "Critic") + " 网络架构（Ant）",
+    markerId: actor ? "mkNetAntA" : "mkNetAntC",
+    input: { label: "观测 s ∈ ℝ⁶⁰", items: ["躯干状态 ·12", "关节状态 ·16", "足端力 ·24", "上步动作 ·8"] },
+    layers: [
+      { type: "fc", in: 60, out: 400, act: "ELU" },
+      { type: "fc", in: 400, out: 200, act: "ELU" },
+      { type: "fc", in: 200, out: 100, act: "ELU" },
+      { type: "fc", in: 100, out: actor ? 8 : 1, act: "线性" }
     ],
-    dims: ["ℝ⁶⁰", "ℝ⁴⁰⁰", "ℝ²⁰⁰", "ℝ¹⁰⁰", "ℝ⁸"],
-    outActor: { main: "a ∈ ℝ⁸", sub: "动作均值" },
-    outCritic: { main: "V(s) ∈ ℝ", sub: "状态价值" }
+    head: actor ? { type: "gaussian", dim: 8 } : { type: "value" }
   };
 }
 /* ---------- SVG：Ant 物理系统示意（俯视）---------- */
@@ -162,6 +115,39 @@ function antSVG() {
   s += '<text class="sb" x="80" y="222" text-anchor="start">俯视示意 · 失败判据（侧视量）：躯干高度 &lt; 0.31 m 即摔倒终止</text>';
   return '<svg viewBox="0 0 820 236" role="img" aria-label="Ant 物理系统示意（俯视）">' +
     '<defs><marker id="mkAnt" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' +
+    s + "</svg>";
+}
+/* ---------- SVG：Ant 控制量示意——侧视放大 1 条腿，画出关节力矩（图 3）---------- */
+function antLegControlSVG() {
+  var s = "";
+  /* 地面与足端触地 */
+  s += '<path class="vb" d="M60 210 H520"/>';
+  s += '<text class="sb" x="100" y="228" text-anchor="middle">地面</text>';
+  s += '<text class="sb" x="392" y="228" text-anchor="middle">足端触地</text>';
+  /* 躯干（局部，球形）与单腿：髋 → 上段 → 踝 → 下段 → 足端 */
+  s += '<circle class="nd io" cx="170" cy="78" r="44"/>';
+  s += '<text class="sb" x="170" y="83" text-anchor="middle">躯干</text>';
+  s += '<path class="ar" style="stroke-width:5;stroke-linecap:round" d="M196 113 L300 158"/>';
+  s += '<path class="ar" style="stroke-width:3.5;stroke-linecap:round" d="M300 158 L352 208"/>';
+  s += '<circle class="mk" cx="196" cy="113" r="4"/>';
+  s += '<circle class="mk" cx="300" cy="158" r="3.4"/>';
+  /* 关节力矩：绕髋、踝各一个弧形箭头（控制量的落点） */
+  s += '<path class="ar" d="M222 113 A 26 26 0 1 1 196 87" fill="none" marker-end="url(#mkTau)"/>';
+  s += '<text class="lb" x="243" y="92" text-anchor="middle">τ</text>';
+  s += '<path class="ar" d="M321 158 A 21 21 0 1 1 300 137" fill="none" marker-end="url(#mkTau)"/>';
+  s += '<text class="lb" x="338" y="140" text-anchor="middle">τ</text>';
+  /* 关节名（引线） */
+  s += '<path class="eg" d="M196 130 L168 176"/><text class="sb" x="162" y="192" text-anchor="end">髋关节 · .*_leg</text>';
+  s += '<path class="eg" d="M318 168 L390 182"/><text class="sb" x="396" y="186" text-anchor="start">踝关节 · .*_foot</text>';
+  /* 右侧注记：控制量的构成与性质 */
+  s += '<text class="lb" x="655" y="78" text-anchor="middle">控制量 = 8 个关节力矩</text>';
+  s += '<text class="sb" x="655" y="106" text-anchor="middle">τ ∈ ℝ⁸ ＝ 4 条腿 × 每腿 2 个主动关节（髋 + 踝）</text>';
+  s += '<text class="sb" x="655" y="130" text-anchor="middle">策略每个控制步输出 8 个数，缩放后直接作为力矩</text>';
+  s += '<text class="sb" x="655" y="154" text-anchor="middle">执行器无内置刚度 / 阻尼，不经 PD 环</text>';
+  /* 视角注记 */
+  s += '<text class="sb" x="60" y="34" text-anchor="start">侧视示意 · 只画 1 条腿；其余 3 条腿同构，各有同样的 2 个力矩关节</text>';
+  return '<svg viewBox="0 0 820 244" role="img" aria-label="Ant 控制量示意（侧视，放大 1 条腿）">' +
+    '<defs><marker id="mkTau" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' +
     s + "</svg>";
 }
 /* ---------- 参数行：名字 | 值 | 设置理由 ---------- */
@@ -230,8 +216,8 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
 
 <h3 class="section-sub"><span class="hnum">3.1</span>网络结构（Actor-Critic）</h3>
 <p>强化学习训练调整的对象是<strong>神经网络的参数</strong>，而非机器人本身。本实验采用 Actor-Critic 架构，两个网络<strong>结构完全相同</strong>（4→32→32→1 的 MLP、ELU 激活），但承担不同职责、输出不同的量，其架构分别如图 3 与图 4 所示。网络规模很小：Actor 1,250 个参数（含 1 个可学习的动作标准差）、Critic 1,249 个参数，合计 2,499 个（实测自检查点文件）。</p>
-<figure>${mlpSVG(cartpoleMlpCfg("actor"))}<figcaption>图 3 · <strong>Actor（策略网络）</strong>的架构：观测向量经两个 ELU 隐藏层映射为动作的<strong>高斯均值</strong>，与可学习的标准差 σ 共同构成随机策略。最终部署的仅此网络。</figcaption></figure>
-<figure>${mlpSVG(cartpoleMlpCfg("critic"))}<figcaption>图 4 · <strong>Critic（价值网络）</strong>的架构：与 Actor 完全同构，输出改为标量价值 <strong>V(s)</strong>，即从当前状态出发的期望累计回报。仅在训练期为 Actor 提供参照，不参与部署。</figcaption></figure>
+<figure>${RLNet.svg(cartpoleMlpCfg("actor"))}<figcaption>图 3 · <strong>Actor（策略网络）</strong>的架构：观测向量经两个 ELU 隐藏层映射为动作均值 <strong>μ</strong>；μ 与独立可学习的 logσ 共同构成高斯策略 <strong>N(μ, σ²)</strong>——训练时从中采样以探索，部署时直接取均值。各层参数量由维度实时计算。最终部署的仅此网络。</figcaption></figure>
+<figure>${RLNet.svg(cartpoleMlpCfg("critic"))}<figcaption>图 4 · <strong>Critic（价值网络）</strong>的架构：隐藏层与 Actor 同构，输出改为标量价值 <strong>V(s)</strong>，即从当前状态出发的期望累计回报。仅在训练期为 Actor 提供参照，不参与部署。</figcaption></figure>
 <div class="plist">
   ${pr("actor_hidden_dims", "[32, 32]", '输入仅 4 维、任务简单，两层 32 的容量已足以拟合；较小的网络训练更快，且不易过拟合。')}
   ${pr("critic_hidden_dims", "[32, 32]", '与 Actor 同构（对称 Actor-Critic）。本任务状态完全可观，无需为 Critic 提供额外的特权信息。')}
@@ -390,23 +376,23 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
 
 <h3 class="section-sub"><span class="hnum">5.4</span>策略行为的定性分析</h3>
 <p>为直观检验收敛策略的实际行为，以下回放由 <code>play.py</code> 加载最终检查点 <code>model_149.pt</code> 在同一环境中录制（时长 5 秒，即一个完整回合）：</p>
-<video controls muted loop playsinline preload="metadata" poster="assets/media/cartpole-balance/frame-early.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/cartpole-balance/play-2026-07-06.mp4"></video>
+<video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/cartpole-balance/frame-early.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/cartpole-balance/play-2026-07-06.mp4"></video>
 <figure>
 <div class="frames">
-  <div><img src="assets/media/cartpole-balance/frame-early.jpg" alt="回合开始：杆带初始倾角"><span class="frame-t">t ≈ 0.1 s · 初始倾斜</span></div>
-  <div><img src="assets/media/cartpole-balance/frame-mid.jpg" alt="约 1 秒：杆已恢复竖直"><span class="frame-t">t ≈ 1 s · 恢复竖直</span></div>
-  <div><img src="assets/media/cartpole-balance/frame-late.jpg" alt="约 4 秒：持续保持竖直"><span class="frame-t">t ≈ 4 s · 持续保持</span></div>
+  <div><img src="assets/media/cartpole-balance/frame-early.jpg" width="1280" height="320" alt="回合开始：杆带初始倾角"><span class="frame-t">t ≈ 0.1 s · 初始倾斜</span></div>
+  <div><img src="assets/media/cartpole-balance/frame-mid.jpg" width="1280" height="320" alt="约 1 秒：杆已恢复竖直"><span class="frame-t">t ≈ 1 s · 恢复竖直</span></div>
+  <div><img src="assets/media/cartpole-balance/frame-late.jpg" width="1280" height="320" alt="约 4 秒：持续保持竖直"><span class="frame-t">t ≈ 4 s · 持续保持</span></div>
 </div>
 <figcaption>图 7 · 收敛策略的行为序列（自回放视频抽帧）。横向黄线为滑轨，蓝色立杆铰接于小车之上。</figcaption>
 </figure>
 <p>如图 7 所示，回合开始时杆因复位随机化带有明显的初始倾角（左）；策略在约 1 秒内将杆恢复至竖直（中）；此后直至回合结束，杆始终保持竖直，小车仅在滑轨中段小幅平移以维持平衡（右）。整段回放中未出现大幅往返或接近边界的行为，与第 5.2 节分项奖励的量化结论（杆角误差贴近零、速度惩罚极小）一致。</p>
 <p><strong>60 秒耐力测试。</strong>训练配置中的回合长度为 5 秒——这是训练阶段的设计选择：5 秒足以判定稳定性，而频繁复位可使策略在更多样的初始状态上训练，因此常规回放至多 5 秒即复位。为检验策略能否长时间维持平衡，另行录制了一段将回合长度覆盖为 60 秒的加时回放（<code>env.episode_length_s=60</code>，仅评估用，训练配置不变）：</p>
-<video controls muted loop playsinline preload="metadata" poster="assets/media/cartpole-balance/frame-e35.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/cartpole-balance/play-endurance-60s.mp4"></video>
+<video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/cartpole-balance/frame-e35.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/cartpole-balance/play-endurance-60s.mp4"></video>
 <figure>
 <div class="frames">
-  <div><img src="assets/media/cartpole-balance/frame-e10.jpg" alt="第 10 秒：杆竖直"><span class="frame-t">t ≈ 10 s</span></div>
-  <div><img src="assets/media/cartpole-balance/frame-e35.jpg" alt="第 35 秒：杆竖直"><span class="frame-t">t ≈ 35 s</span></div>
-  <div><img src="assets/media/cartpole-balance/frame-e59.jpg" alt="第 59 秒：杆竖直"><span class="frame-t">t ≈ 59 s</span></div>
+  <div><img src="assets/media/cartpole-balance/frame-e10.jpg" width="1280" height="320" alt="第 10 秒：杆竖直"><span class="frame-t">t ≈ 10 s</span></div>
+  <div><img src="assets/media/cartpole-balance/frame-e35.jpg" width="1280" height="320" alt="第 35 秒：杆竖直"><span class="frame-t">t ≈ 35 s</span></div>
+  <div><img src="assets/media/cartpole-balance/frame-e59.jpg" width="1280" height="320" alt="第 59 秒：杆竖直"><span class="frame-t">t ≈ 59 s</span></div>
 </div>
 <figcaption>图 8 · 60 秒耐力回放的抽帧。三个时刻杆均保持竖直、小车均位于滑轨中点附近，全程无失败复位。</figcaption>
 </figure>
@@ -467,6 +453,8 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 <p>本任务通过强化学习训练一个策略，使四足机器人 Ant 朝固定目标方向持续行走。被控系统如图 2 所示。</p>
 <figure>${antSVG()}<figcaption>图 2 · Ant 物理系统示意（俯视）。球形躯干四周对称分布 4 条两段式腿，每腿 2 个关节（髋 <code>.*_leg</code> + 踝 <code>.*_foot</code>），共 8 个可驱动关节；任务目标为朝 +x 方向的远处目标点 (1000, 0, 0) 行走，躯干高度低于 0.31 m 判定摔倒、回合失败终止。</figcaption></figure>
 <p><strong>机器人</strong>：躯干 + 4 条腿共 8 个力矩驱动关节——4 个髋关节（<code>.*_leg</code>）与 4 个踝关节（<code>.*_foot</code>，初始角 ±45°）；执行器无内置刚度与阻尼，策略输出即关节力矩。</p>
+<p><strong>控制</strong>：策略每个控制步能做的唯一一件事，是给这 8 个关节各输出一个力矩，如图 3 所示。力矩驱动腿绕关节摆动，四条腿的摆动配合成周期性步态，机器人由此前进——从"出力矩"到"会走路"之间没有任何手写的控制器，全部由策略学出。</p>
+<figure>${antLegControlSVG()}<figcaption>图 3 · 控制量示意（侧视，放大 1 条腿）。每条腿两个主动关节——髋（<code>.*_leg</code>）与踝（<code>.*_foot</code>）——各受一个力矩 τ 驱动（弧形箭头）；4 条腿共 8 个力矩，即策略的全部输出。执行器无内置刚度与阻尼，网络输出经缩放后直接作为关节力矩（细节见第 3.2 节）。</figcaption></figure>
 <p><strong>目标</strong>：朝 +x 方向的目标点 (1000, 0, 0) 持续行走——目标足够远，等价于"一直往前走"；同时保持躯干直立不摔倒。</p>
 <p>相比 Cartpole，本任务的难度提升是本质性的：动作从 1 维升至 8 维，策略须协调 4 条腿形成周期性步态；机器人与地面的<strong>接触动力学</strong>（足端的离地、触地、摩擦）高度非线性；且"走得快"（前进奖励）与"走得稳"（不摔倒）、"走得省"（能耗惩罚）之间存在多目标权衡。这是本系列从"平衡"迈向"行走"的第一步。</p>
 <p>按 MDP 框架，问题的各要素定义见表 2：</p>
@@ -492,9 +480,9 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 <p>本节完整描述本实验的构成：策略由两个神经网络组成（3.1），读入 60 维观测、输出 8 维关节力矩（3.2），其行为由 7 项奖励塑造（3.3），回合的起止方式见 3.4，PPO 训练流程见 3.5，运行环境与全部超参数见 3.6。</p>
 
 <h3 class="section-sub"><span class="hnum">3.1</span>网络结构（Actor-Critic）</h3>
-<p>Actor 与 Critic 仍为同构 MLP（60→400→200→100→输出，ELU 激活），架构分别如图 3 与图 4 所示。相比 Cartpole 的 32×2 隐藏层，网络加宽加深以匹配 60 维观测与 8 维动作的表达需求：Actor 125,516 个参数（含 8 个可学习的动作标准差）、Critic 124,801 个，合计 250,317 个（实测自检查点文件），约为 Cartpole 网络的 100 倍。</p>
-<figure>${mlpSVG(antMlpCfg("actor"))}<figcaption>图 3 · <strong>Actor（策略网络）</strong>的架构：60 维观测经三个 ELU 隐藏层映射为 8 维动作的<strong>高斯均值</strong>，与逐维可学习的标准差 σ 共同构成随机策略。最终部署的仅此网络。</figcaption></figure>
-<figure>${mlpSVG(antMlpCfg("critic"))}<figcaption>图 4 · <strong>Critic（价值网络）</strong>的架构：与 Actor 同构，输出改为标量价值 <strong>V(s)</strong>。仅在训练期为 Actor 提供参照，不参与部署。</figcaption></figure>
+<p>Actor 与 Critic 仍为同构 MLP（60→400→200→100→输出，ELU 激活），架构分别如图 4 与图 5 所示。相比 Cartpole 的 32×2 隐藏层，网络加宽加深以匹配 60 维观测与 8 维动作的表达需求：Actor 125,516 个参数（含 8 个可学习的动作标准差）、Critic 124,801 个，合计 250,317 个（实测自检查点文件），约为 Cartpole 网络的 100 倍。</p>
+<figure>${RLNet.svg(antMlpCfg("actor"))}<figcaption>图 4 · <strong>Actor（策略网络）</strong>的架构：60 维观测经三个 ELU 隐藏层映射为 8 维动作均值 <strong>μ</strong>；μ 与逐维可学习的 logσ 共同构成高斯策略 <strong>N(μ, σ²)</strong>——训练时从中采样以探索，部署时直接取均值。各层参数量由维度实时计算。最终部署的仅此网络。</figcaption></figure>
+<figure>${RLNet.svg(antMlpCfg("critic"))}<figcaption>图 5 · <strong>Critic（价值网络）</strong>的架构：隐藏层与 Actor 同构，末层输出改为 1 维的标量价值 <strong>V(s)</strong>。仅在训练期为 Actor 提供参照，不参与部署。</figcaption></figure>
 <div class="plist">
   ${pr("actor_hidden_dims", "[400, 200, 100]", '官方为该任务配置的容量：60 维输入、8 维输出，且需在网络内部隐式形成步态协调，32×2 量级的小网络不再够用。金字塔形逐层收窄是常见做法。')}
   ${pr("critic_hidden_dims", "[400, 200, 100]", '与 Actor 同构（对称 Actor-Critic），本任务状态完全可观。')}
@@ -535,7 +523,7 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 </div>
 
 <h3 class="section-sub"><span class="hnum">3.3</span>奖励函数（7 项）</h3>
-<p>各项奖励仍按<strong>权重 × 控制步长（1/60 s）</strong>逐步累加（terminating 类事件奖励除外，本任务没有该类项）。构成为 <strong>1 个主目标（progress，前进）+ 3 个正向辅助（alive / upright / move_to_target）+ 3 个正则惩罚（action_l2 / energy / joint_pos_limits）</strong>——相比 Cartpole 的"主目标 + 失败重罚 + 塑形"，本任务用持续的姿态/朝向奖励替代了一次性失败重罚。七项权重的构成如图 5 所示。</p>
+<p>各项奖励仍按<strong>权重 × 控制步长（1/60 s）</strong>逐步累加（terminating 类事件奖励除外，本任务没有该类项）。构成为 <strong>1 个主目标（progress，前进）+ 3 个正向辅助（alive / upright / move_to_target）+ 3 个正则惩罚（action_l2 / energy / joint_pos_limits）</strong>——相比 Cartpole 的"主目标 + 失败重罚 + 塑形"，本任务用持续的姿态/朝向奖励替代了一次性失败重罚。七项权重的构成如图 6 所示。</p>
 <figure>
 <div class="rewards">
   <div class="rw"><span class="nm">progress<small>朝目标前进的速度</small></span><span class="bar"><i class="p" style="width:50%"></i></span><span class="w p">+1.0</span></div>
@@ -546,7 +534,7 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
   <div class="rw"><span class="nm">energy<small>能耗惩罚</small></span><span class="bar"><i class="n" style="width:24.6%"></i></span><span class="w n">−0.05</span></div>
   <div class="rw"><span class="nm">action_l2<small>动作幅值惩罚</small></span><span class="bar"><i class="n" style="width:5%"></i></span><span class="w n">−0.005</span></div>
 </div>
-<figcaption>图 5 · 奖励各项的权重。中线为零点，向右（绿）为奖励、向左（红）为惩罚；权重跨三个数量级，条长按对数刻度示意本实验内各项的相对量级，精确数值以右列为准。</figcaption>
+<figcaption>图 6 · 奖励各项的权重。中线为零点，向右（绿）为奖励、向左（红）为惩罚；权重跨三个数量级，条长按对数刻度示意本实验内各项的相对量级，精确数值以右列为准。</figcaption>
 </figure>
 <p>下面逐项说明各项的定义、设计动机，以及移除后的影响（其中 energy 项的"若移除"推断在第 6 节以真实消融实验检验）：</p>
 <div class="plist">
@@ -625,16 +613,16 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 <p class="chart-note">命令未覆盖任何影响训练结果的超参——随机种子、迭代数、并行环境数均取任务注册的默认配置（42 / 1000 / 4096）。曲线写入本地 TensorBoard，由 <code>scripts/export_run.py</code> 导出为本页数据。</p>
 
 <h2 class="section-title"><span class="hnum">4</span>实验结果</h2>
-<p>主 run（baseline，种子 42）共 1000 次迭代、约 1.31 亿步仿真；训练循环总耗时约 4.9 分钟（经验采集 206 秒、网络更新 85 秒，不含仿真器启动），平均吞吐约每秒 45 万步。总体结果：平均回报由初始的 −0.46 升至 <strong>129.9</strong>（末 100 迭代均值 122.5）；平均回合长度由 19.7 步升至 <strong>951 步</strong>（上限 960，末 100 迭代均值 908.7）；收敛后仍有约 <strong>7%</strong> 的回合以摔倒终止。全部训练曲线如图 6 所示，逐条解读见第 5 节。</p>
+<p>主 run（baseline，种子 42）共 1000 次迭代、约 1.31 亿步仿真；训练循环总耗时约 4.9 分钟（经验采集 206 秒、网络更新 85 秒，不含仿真器启动），平均吞吐约每秒 45 万步。总体结果：平均回报由初始的 −0.46 升至 <strong>129.9</strong>（末 100 迭代均值 122.5）；平均回合长度由 19.7 步升至 <strong>951 步</strong>（上限 960，末 100 迭代均值 908.7）；收敛后仍有约 <strong>7%</strong> 的回合以摔倒终止。全部训练曲线如图 7 所示，逐条解读见第 5 节。</p>
 <figure class="chart-fig">
 <div data-rl-chart="locomotion/ant-walk"></div>
-<figcaption>图 6 · 主 run 训练全程的全部记录曲线（21 条，按类别分组）。数据由本地 TensorBoard 导出、plotly 渲染，未作平滑或修饰。</figcaption>
+<figcaption>图 7 · 主 run 训练全程的全部记录曲线（21 条，按类别分组）。数据由本地 TensorBoard 导出、plotly 渲染，未作平滑或修饰。</figcaption>
 </figure>
 
 <h2 class="section-title"><span class="hnum">5</span>实验分析</h2>
 
 <h3 class="section-sub"><span class="hnum">5.1</span>学习过程的三个阶段</h3>
-<p>将图 6 中的主曲线与终止占比曲线对照阅读，本次学习大致分为三个阶段：</p>
+<p>将图 7 中的主曲线与终止占比曲线对照阅读，本次学习大致分为三个阶段：</p>
 <div class="plist">
   ${pr("Ⅰ · 先学会不摔", "第 0–43 迭代", '回报先降至 <b>−5.73</b>（第 20 迭代）：随机力矩下正则惩罚全额扣分而前进为零。但回合长度以极快速度改善——第 31 迭代平均已超 900 步。值得注意的是摔倒占比在第 50 迭代前后达到峰值约 17%：策略先学会的是"不乱动就不容易摔"，而非行走。回报在第 43 迭代转正过 10。')}
   ${pr("Ⅱ · 学会行走", "第 43–181 迭代", '回报进入快速上升期：第 76 迭代过 50，第 181 迭代过 100。这一阶段 progress 项成为回报主体——策略从"站住"过渡到"向前走"，摔倒占比同步回落至约 10%。')}
@@ -651,35 +639,35 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 </div>
 
 <h3 class="section-sub"><span class="hnum">5.3</span>多种子稳定性</h3>
-<p>本任务没有可解析计算的回报上限，收敛质量以多种子间的一致性作定量参照。基线配置以 3 个随机种子（42 / 43 / 44）独立重复训练，回报曲线如图 7 所示：三条曲线形态一致，末 100 迭代均值分别为 122.5、116.7、122.1，种子间统计为 <strong>120.4 ± 3.2</strong>（标准差仅为均值的 2.7%）；平均回合长度 906.3 ± 2.6 步、摔倒占比 7.0% ± 0.7% 同样高度一致。可以认为主 run 的结论不依赖于特定种子。</p>
+<p>本任务没有可解析计算的回报上限，收敛质量以多种子间的一致性作定量参照。基线配置以 3 个随机种子（42 / 43 / 44）独立重复训练，回报曲线如图 8 所示：三条曲线形态一致，末 100 迭代均值分别为 122.5、116.7、122.1，种子间统计为 <strong>120.4 ± 3.2</strong>（标准差仅为均值的 2.7%）；平均回合长度 906.3 ± 2.6 步、摔倒占比 7.0% ± 0.7% 同样高度一致。可以认为主 run 的结论不依赖于特定种子。</p>
 <figure class="chart-fig">
 <div data-rl-compare="locomotion/ant-walk-seeds"></div>
-<figcaption>图 7 · 基线配置 3 个随机种子的回报曲线（Train/mean_reward）。三条曲线以线型区分，形态与终值高度一致。</figcaption>
+<figcaption>图 8 · 基线配置 3 个随机种子的回报曲线（Train/mean_reward）。三条曲线以线型区分，形态与终值高度一致。</figcaption>
 </figure>
 
 <h3 class="section-sub"><span class="hnum">5.4</span>策略行为的定性分析</h3>
 <p>以下回放由跟随镜头录制（加载主 run 最终检查点 <code>model_999.pt</code>，时长 16 秒即一个完整回合；镜头随机器人移动，地面网格的流动反映实际前进）：</p>
-<video controls muted loop playsinline preload="metadata" poster="assets/media/ant-walk/frame-mid.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/ant-walk/play-16s.mp4"></video>
+<video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/ant-walk/frame-mid.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/ant-walk/play-16s.mp4"></video>
 <figure>
 <div class="frames">
-  <div><img src="assets/media/ant-walk/frame-early.jpg" alt="第 1 秒：起步"><span class="frame-t">t ≈ 1 s</span></div>
-  <div><img src="assets/media/ant-walk/frame-mid.jpg" alt="第 8 秒：行进中"><span class="frame-t">t ≈ 8 s</span></div>
-  <div><img src="assets/media/ant-walk/frame-late.jpg" alt="第 15 秒：持续行进"><span class="frame-t">t ≈ 15 s</span></div>
+  <div><img src="assets/media/ant-walk/frame-early.jpg" width="1280" height="480" alt="第 1 秒：起步"><span class="frame-t">t ≈ 1 s</span></div>
+  <div><img src="assets/media/ant-walk/frame-mid.jpg" width="1280" height="480" alt="第 8 秒：行进中"><span class="frame-t">t ≈ 8 s</span></div>
+  <div><img src="assets/media/ant-walk/frame-late.jpg" width="1280" height="480" alt="第 15 秒：持续行进"><span class="frame-t">t ≈ 15 s</span></div>
 </div>
-<figcaption>图 8 · 收敛策略的行走序列（自回放视频抽帧，跟随镜头）。三个时刻躯干均保持撑起，四腿处于步态周期的不同相位。</figcaption>
+<figcaption>图 9 · 收敛策略的行走序列（自回放视频抽帧，跟随镜头）。三个时刻躯干均保持撑起，四腿处于步态周期的不同相位。</figcaption>
 </figure>
-<p>如图 8 所示，策略全程保持躯干撑起、四腿交替支撑前进，未出现拖行或翻倒；视频中可见其以近似对角交替的方式协调四腿、朝固定方向持续行走。</p>
+<p>如图 9 所示，策略全程保持躯干撑起、四腿交替支撑前进，未出现拖行或翻倒；视频中可见其以近似对角交替的方式协调四腿、朝固定方向持续行走。</p>
 <p><strong>60 秒耐力测试。</strong>与 Cartpole 实验相同的做法：将回合长度覆盖为 60 秒（<code>env.episode_length_s=60.0</code>，仅评估用）录制加时回放，检验长时间行走的持续性：</p>
-<video controls muted loop playsinline preload="metadata" poster="assets/media/ant-walk/frame-e35.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/ant-walk/play-endurance-60s.mp4"></video>
+<video width="960" height="540" controls muted loop playsinline preload="metadata" poster="assets/media/ant-walk/frame-e35.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/ant-walk/play-endurance-60s.mp4"></video>
 <figure>
 <div class="frames">
-  <div><img src="assets/media/ant-walk/frame-e10.jpg" alt="第 10 秒"><span class="frame-t">t ≈ 10 s</span></div>
-  <div><img src="assets/media/ant-walk/frame-e35.jpg" alt="第 35 秒"><span class="frame-t">t ≈ 35 s</span></div>
-  <div><img src="assets/media/ant-walk/frame-e58.jpg" alt="第 58 秒"><span class="frame-t">t ≈ 58 s</span></div>
+  <div><img src="assets/media/ant-walk/frame-e10.jpg" width="1280" height="480" alt="第 10 秒"><span class="frame-t">t ≈ 10 s</span></div>
+  <div><img src="assets/media/ant-walk/frame-e35.jpg" width="1280" height="480" alt="第 35 秒"><span class="frame-t">t ≈ 35 s</span></div>
+  <div><img src="assets/media/ant-walk/frame-e58.jpg" width="1280" height="480" alt="第 58 秒"><span class="frame-t">t ≈ 58 s</span></div>
 </div>
-<figcaption>图 9 · 60 秒耐力回放的抽帧。三个时刻均保持行走姿态，全程未摔倒。</figcaption>
+<figcaption>图 10 · 60 秒耐力回放的抽帧。三个时刻均保持行走姿态，全程未摔倒。</figcaption>
 </figure>
-<p>如图 9 所示，整段 60 秒回放中机器人持续行走、未发生摔倒。需要说明的是，这是单次回放的结果：训练统计中约 7% 的回合以摔倒终止（第 5.2 节），单次 60 秒不摔并不代表零摔倒率，只说明"持续行走一分钟"在该策略的正常能力范围之内。</p>
+<p>如图 10 所示，整段 60 秒回放中机器人持续行走、未发生摔倒。需要说明的是，这是单次回放的结果：训练统计中约 7% 的回合以摔倒终止（第 5.2 节），单次 60 秒不摔并不代表零摔倒率，只说明"持续行走一分钟"在该策略的正常能力范围之内。</p>
 
 <h2 class="section-title"><span class="hnum">6</span>消融与对比实验</h2>
 <p>为检验两处设计选择的实际作用，本实验开展了 3 条件 × 3 种子共 9 个 run 的消融：各条件的覆盖参数如表 4 所示，除该单参数外所有 run 配置完全相同，种子取 42 / 43 / 44，统计口径为末 100 迭代均值的种子间均值 ± 标准差（n=3, ddof=1）。</p>
@@ -692,10 +680,10 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
     <tr><td>entropy</td><td><code>agent.algorithm.entropy_coef=0.005</code></td><td>本任务官方默认关闭熵正则（系数 0），开启后是否有益</td></tr>
   </tbody>
 </table>
-<p>9 个 run 的回报曲线如图 10 所示，关键指标汇总见表 5：</p>
+<p>9 个 run 的回报曲线如图 11 所示，关键指标汇总见表 5：</p>
 <figure class="chart-fig">
 <div data-rl-compare="locomotion/ant-walk-ablation"></div>
-<figcaption>图 10 · 消融实验的回报曲线（Train/mean_reward，9 个 run）。同条件同色、种子以线型区分。注意 no-energy 组的奖励函数与另两组不同（缺少能耗扣分项），其回报数值不能与另两组直接比较，组内种子间对比仍有效。</figcaption>
+<figcaption>图 11 · 消融实验的回报曲线（Train/mean_reward，9 个 run）。同条件同色、种子以线型区分。注意 no-energy 组的奖励函数与另两组不同（缺少能耗扣分项），其回报数值不能与另两组直接比较，组内种子间对比仍有效。</figcaption>
 </figure>
 <table>
   <caption>表 5 · 消融结果（末 100 迭代，种子间均值 ± 标准差，n=3）</caption>
