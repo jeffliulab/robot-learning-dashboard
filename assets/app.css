@@ -10,7 +10,7 @@
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Songti SC","Times New Roman",Georgia,serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
   --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
-  --topbar-h:60px; --sidebar-w:250px; --read:880px;
+  --topbar-h:52px; --sidebar-w:250px; --read:880px;
 }
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ color-scheme:dark;
   --paper:#15130f; --paper-2:#1e1a15; --card:#1a1712; --ink:#ece7dc; --ink-2:#a89f8e; --ink-3:#756d5d;
@@ -66,7 +66,7 @@ body.has-toc .toc{display:block;position:sticky;top:var(--topbar-h);align-self:s
 .toc a:hover{color:var(--ink);text-decoration:none;}
 .toc a.on{color:var(--accent);border-left-color:var(--accent);font-weight:600;}
 .toc a.on .tn{color:var(--accent);}
-#view h2.section-title,#view h3.section-sub{scroll-margin-top:78px;}   /* 锚点跳转时避开 sticky 顶栏 */
+#view h2.section-title,#view h3.section-sub{scroll-margin-top:calc(var(--topbar-h) + 18px);}   /* 锚点跳转时避开 sticky 顶栏 */
 @media (max-width:1150px){ body.has-toc .layout{grid-template-columns:var(--sidebar-w) minmax(0,1fr);} body.has-toc .toc{display:none;} }
 
 /* ---------- 左侧栏（二级组/三级实验）---------- */

@@ -137,6 +137,7 @@
   /* ---------- 右侧页内目录（TOC）+ scroll-spy ----------
      注意: 站点用 location.hash 做路由, TOC 点击必须走 JS 滚动、绝不能改 hash。 */
   var tocHeads = [];
+  var spyThreshold = 0;
   function buildToc(view, noSidebar) {
     var toc = el("toc"); if (!toc) return;
     toc.innerHTML = ""; tocHeads = [];
@@ -144,6 +145,8 @@
     var ok = !noSidebar && tops.length >= 2;
     document.body.classList.toggle("has-toc", ok);
     if (!ok) return;
+    var topbarHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h")) || 52;
+    spyThreshold = topbarHeight + 50;
     toc.appendChild(h("div", { class: "t" }, ["本页导航"]));
     var hs = view.querySelectorAll("h2.section-title, h3.section-sub");  // 一二级混排(文档顺序)
     Array.prototype.forEach.call(hs, function (hd, i) {
@@ -170,7 +173,7 @@
   function spy() {
     if (!tocHeads.length) return;
     var cur = tocHeads[0];
-    tocHeads.forEach(function (x) { if (x.head.getBoundingClientRect().top <= 110) cur = x; });
+    tocHeads.forEach(function (x) { if (x.head.getBoundingClientRect().top <= spyThreshold) cur = x; });
     tocHeads.forEach(function (x) { x.link.classList.toggle("on", x === cur); });
   }
   window.addEventListener("scroll", function () { spy(); }, { passive: true });
