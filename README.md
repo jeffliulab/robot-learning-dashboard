@@ -46,7 +46,7 @@ blocked by the browser.
 
 ## Adding an experiment
 
-1. Read `AGENTS.md` and the parent repository template at `../../STANDARDS/实验报告/实验报告模板.md`.
+1. Read `AGENTS.md` and the parent repository template at `../../../STANDARDS/实验报告/实验报告模板.md`.
 2. Train (Isaac Lab / RSL-RL, etc.) so the run lands in `logs/rsl_rl/<exp>/<timestamp>/`.
 3. Run `python scripts/export_run.py <run_dir> <task>/<experiment-id>` to write `data/<task>/<id>.js`.
 4. Register the experiment in `data/manifest.js`.
