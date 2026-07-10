@@ -1,0 +1,73 @@
+{
+  "video": "assets/media/g1-flat/play-follow-endurance-60s.mp4",
+  "width": 1280,
+  "height": 720,
+  "fps": 50.0,
+  "frames": 3000,
+  "duration_s": 60.0,
+  "follow_camera": {
+    "origin_type": "asset_root",
+    "asset_name": "robot",
+    "eye": [
+      -3.0,
+      -3.0,
+      1.6
+    ],
+    "lookat": [
+      0.35,
+      0.0,
+      0.7
+    ]
+  },
+  "episode_length_s_override": 60.0,
+  "images": {
+    "frame-e10.jpg": {
+      "frame": 500,
+      "t_s": 10.0,
+      "width": 1280,
+      "height": 720,
+      "mean_bgr": [
+        74.29,
+        63.76,
+        56.03
+      ],
+      "std_bgr": [
+        62.22,
+        60.36,
+        57.37
+      ]
+    },
+    "frame-e35.jpg": {
+      "frame": 1750,
+      "t_s": 35.0,
+      "width": 1280,
+      "height": 720,
+      "mean_bgr": [
+        74.5,
+        63.37,
+        56.13
+      ],
+      "std_bgr": [
+        62.49,
+        60.34,
+        57.58
+      ]
+    },
+    "frame-e58.jpg": {
+      "frame": 2900,
+      "t_s": 58.0,
+      "width": 1280,
+      "height": 720,
+      "mean_bgr": [
+        73.81,
+        62.66,
+        55.29
+      ],
+      "std_bgr": [
+        61.4,
+        59.28,
+        56.28
+      ]
+    }
+  }
+}

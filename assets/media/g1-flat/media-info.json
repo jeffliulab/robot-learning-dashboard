@@ -1,0 +1,72 @@
+{
+  "video": "assets/media/g1-flat/play-follow-10s.mp4",
+  "width": 1280,
+  "height": 720,
+  "fps": 50.0,
+  "frames": 499,
+  "duration_s": 9.98,
+  "follow_camera": {
+    "origin_type": "asset_root",
+    "asset_name": "robot",
+    "eye": [
+      -3.0,
+      -3.0,
+      1.6
+    ],
+    "lookat": [
+      0.35,
+      0.0,
+      0.7
+    ]
+  },
+  "images": {
+    "frame-early.jpg": {
+      "frame": 89,
+      "t_s": 1.78,
+      "width": 1280,
+      "height": 720,
+      "mean_bgr": [
+        75.27,
+        64.57,
+        57.13
+      ],
+      "std_bgr": [
+        63.05,
+        61.18,
+        58.24
+      ]
+    },
+    "frame-mid.jpg": {
+      "frame": 249,
+      "t_s": 4.98,
+      "width": 1280,
+      "height": 720,
+      "mean_bgr": [
+        74.45,
+        63.58,
+        56.2
+      ],
+      "std_bgr": [
+        62.2,
+        60.21,
+        57.3
+      ]
+    },
+    "frame-late.jpg": {
+      "frame": 409,
+      "t_s": 8.18,
+      "width": 1280,
+      "height": 720,
+      "mean_bgr": [
+        74.58,
+        63.68,
+        56.23
+      ],
+      "std_bgr": [
+        62.19,
+        60.19,
+        57.25
+      ]
+    }
+  }
+}

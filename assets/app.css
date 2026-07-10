@@ -57,11 +57,15 @@ body.no-sidebar .layout{grid-template-columns:1fr;}
 body.has-toc .toc{display:block;position:sticky;top:var(--topbar-h);align-self:start;
   height:calc(100vh - var(--topbar-h));overflow:auto;padding:30px 18px 60px 6px;border-left:1px solid var(--rule);}
 .toc .t{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px;padding-left:12px;}
-.toc a{display:block;font-size:12.5px;color:var(--ink-3);padding:4px 8px 4px 12px;line-height:1.5;
-  border-left:2px solid var(--rule);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.toc a.sub{padding-left:26px;font-size:12px;}   /* 二级目录项：缩进 */
+.toc a{display:flex;align-items:baseline;gap:6px;font-size:12.5px;color:var(--ink-2);font-weight:600;padding:4px 8px 4px 12px;line-height:1.5;
+  border-left:2px solid var(--rule);white-space:nowrap;overflow:hidden;}
+.toc a.sub{padding-left:30px;font-size:12px;color:var(--ink-3);font-weight:400;}   /* 二级目录项：缩进 */
+.toc a .tn{flex:0 0 auto;font-family:var(--mono);font-size:11px;color:var(--ink-3);}
+.toc a.sub .tn{font-size:10.5px;}
+.toc a .tl{min-width:0;overflow:hidden;text-overflow:ellipsis;}
 .toc a:hover{color:var(--ink);text-decoration:none;}
 .toc a.on{color:var(--accent);border-left-color:var(--accent);font-weight:600;}
+.toc a.on .tn{color:var(--accent);}
 #view h2.section-title,#view h3.section-sub{scroll-margin-top:78px;}   /* 锚点跳转时避开 sticky 顶栏 */
 @media (max-width:1150px){ body.has-toc .layout{grid-template-columns:var(--sidebar-w) minmax(0,1fr);} body.has-toc .toc{display:none;} }
 

@@ -158,6 +158,10 @@ function pr(k, v, why) {
 function kv(k, v) {
   return '<div class="pr kv"><span class="pk">' + k + '</span><span class="pv">' + v + "</span></div>";
 }
+function table(inner, label) {
+  var aria = label ? ' aria-label="' + String(label).replace(/"/g, "&quot;") + '"' : "";
+  return "<table" + aria + ">" + inner + "</table>";
+}
 
 /* ============================= Cartpole 平衡实验 ============================= */
 window.RL_CONTENT["locomotion/cartpole-balance"] = `
@@ -169,9 +173,10 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
   <caption>表 1 · 实验概要</caption>
   <tbody>
     <tr><td class="k">状态</td><td><strong>已训练 ✓</strong>　<span class="mono" style="font-family:var(--mono);font-size:13px">run 2026-07-06_08-00-30</span></td></tr>
-    <tr><td class="k">机器人</td><td>Cartpole（倒立摆小车）</td></tr>
+    <tr><td class="k">机器人</td><td>Cartpole（倒立摆小车；2 个关节，滑轨关节主动 effort、杆关节被动）</td></tr>
     <tr><td class="k">技术路线</td><td>强化学习 · PPO</td></tr>
     <tr><td class="k">任务环境</td><td><code>Isaac-Cartpole-v0</code>（Isaac Lab）</td></tr>
+    <tr><td class="k">任务配置</td><td>Isaac Lab 官方预设，未作任何修改</td></tr>
     <tr><td class="k">并行环境数</td><td>4096</td></tr>
     <tr><td class="k">训练迭代数</td><td>150（每次迭代学习一批新采集的经验）</td></tr>
     <tr><td class="k">训练耗时</td><td>约 17 秒（采集 11.3 s + 更新 5.3 s，不含仿真器启动）</td></tr>
@@ -187,9 +192,10 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
 <h2 class="section-title"><span class="hnum">1</span>背景与问题定义</h2>
 <p>本任务通过强化学习训练一个策略，使倒立摆（Cartpole）保持平衡不倒。被控系统如图 2 所示。</p>
 <figure>${cartpoleSVG()}<figcaption>图 2 · Cartpole 物理系统示意。小车经关节 <code>slider_to_cart</code> 沿水平滑轨平移，杆经被动铰接关节 <code>cart_to_pole</code> 绕小车自由转动；控制输入是施加于小车的水平力 F，θ 为杆偏离竖直方向的角度，小车位置越出 ±3 m 边界则回合失败终止。</figcaption></figure>
-<p><strong>机器人</strong>：一辆小车与一根铰接于其上的杆，共两个关节——<code>slider_to_cart</code>（小车沿滑轨水平平移）与 <code>cart_to_pole</code>（杆绕小车自由转动）。</p>
-<p><strong>目标</strong>：仅对小车施力，使杆保持竖直不倒、且小车不越出边界。</p>
-<p>本任务是一个经典的<strong>欠驱动</strong>问题：无法直接对杆施力，只能推动小车，借助小车的加减速间接维持杆的平衡。它虽然简单，却包含了行走控制的核心结构——通过不断调整身体维持不倒，因此选作 locomotion 系列的第一个实验。</p>
+<p><strong>机器人</strong>：一辆小车与一根铰接于其上的杆，共两个关节——<code>slider_to_cart</code>（小车沿滑轨水平平移）与 <code>cart_to_pole</code>（杆绕小车自由转动）。其中小车滑轨关节为主动驱动，杆关节为被动铰接。</p>
+<p><strong>控制</strong>：策略每个控制步只输出一个水平力，作用在 <code>slider_to_cart</code> 上。水平力改变小车加速度，小车作为杆的支点移动，进而改变杆的角速度与角度；从“推小车”到“保持杆竖直”之间没有手写平衡控制器，全部由策略学出。</p>
+<p><strong>目标</strong>：使杆保持竖直不倒，且小车不越出边界。</p>
+<p>本任务是一个经典的<strong>欠驱动</strong>问题：无法直接对杆施力，只能推动小车，借助小车的加减速间接维持杆的平衡。</p>
 <p>按强化学习的标准框架（马尔可夫决策过程，MDP），问题的各要素定义见表 2：</p>
 <table class="kv-table">
   <caption>表 2 · 问题的形式化定义</caption>
@@ -209,12 +215,12 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
 <p>强化学习的求解方法大体分为两族。<strong>价值法</strong>（如 Q-learning、DQN）学习每个状态–动作对的价值，再取价值最大的动作，天然适合动作可枚举的离散问题；本任务的动作是连续的水平力，无法枚举，因此采用<strong>策略梯度法</strong>——直接参数化策略并沿提升期望回报的方向更新参数。纯策略梯度的估计方差较大，实践中普遍采用 <strong>Actor-Critic</strong> 架构降低方差：Actor 即策略本身，负责输出动作；Critic 估计状态价值 V(s)，为策略更新提供基准，仅在训练期使用。</p>
 <p>更新的方向由<strong>优势</strong>（advantage）决定：<code>A = 实际回报 − V(s)</code>，即某一动作相对 Critic 预期的好坏程度。优势的最小构件是时序差分误差 <code>δ = r + γ·V(s′) − V(s)</code>，多步 δ 经 GAE(λ) 加权聚合为更稳定的优势估计，以在偏差与方差之间取得折中。训练同时优化三项：<strong>策略损失</strong>（记 Loss/surrogate）按优势加权调整各动作的概率；<strong>价值损失</strong>（记 Loss/value）使 Critic 的预测逼近实际回报；<strong>熵正则项</strong>对动作分布的随机性给予小额奖励，防止策略过早收敛到次优解。</p>
 <p>策略梯度方法的实用难点在于更新步长：单次过大的更新可能使策略崩溃且难以恢复。<strong>PPO</strong>（Proximal Policy Optimization，近端策略优化）的处理方式是<strong>裁剪</strong>：当新旧策略的概率比越出 [1−ε, 1+ε] 区间时，其对优化目标的贡献被截断，从而失去继续外推的梯度激励，使每次更新仅前进一小步。</p>
-<p>本实验选用 PPO 的依据有四：任务动作连续，属于策略梯度法的适用域；本实验采用数千个并行环境采样，与 PPO 这类 on-policy 算法的大批量数据需求恰好匹配；PPO 实现简单、对超参数不敏感，官方默认配置通常无需调整；它也是机器人运动控制领域的事实标准算法，与本系列后续实验所用的 rsl_rl 训练框架深度集成。</p>
+<p>本实验选用 PPO 的依据有四：任务动作连续，属于策略梯度法的适用域；本实验采用数千个并行环境采样，与 PPO 这类 on-policy 算法的大批量数据需求恰好匹配；PPO 实现简单、对超参数不敏感，官方默认配置通常无需调整；它也是机器人运动控制领域常用的事实标准算法，并与 RSL-RL 等训练框架有成熟配套。</p>
 
 <h2 class="section-title"><span class="hnum">3</span>实验框架</h2>
 <p>本节完整描述本实验的构成：策略由两个神经网络组成（3.1），读入 4 维观测、输出 1 维力（3.2），其行为由一组奖励规则塑造（3.3），回合的起止方式决定了训练所见的状态分布（3.4），PPO 在大量并行环境中迭代优化上述网络（3.5），最后给出运行环境、全部超参数与复现方式（3.6）。</p>
 
-<h3 class="section-sub"><span class="hnum">3.1</span>网络结构（Actor-Critic）</h3>
+<h3 class="section-sub"><span class="hnum">3.1</span>网络结构</h3>
 <p>强化学习训练调整的对象是<strong>神经网络的参数</strong>，而非机器人本身。本实验采用 Actor-Critic 架构，两个网络<strong>结构完全相同</strong>（4→32→32→1 的 MLP、ELU 激活），但承担不同职责、输出不同的量，其架构分别如图 3 与图 4 所示。网络规模很小：Actor 1,250 个参数（含 1 个可学习的动作标准差）、Critic 1,249 个参数，合计 2,499 个（实测自检查点文件）。</p>
 <figure>${RLNet.svg(cartpoleMlpCfg("actor"))}<figcaption>图 3 · <strong>Actor（策略网络）</strong>的架构：观测向量经两个 ELU 隐藏层映射为动作均值 <strong>μ</strong>；μ 与独立可学习的 logσ 共同构成高斯策略 <strong>N(μ, σ²)</strong>——训练时从中采样以探索，部署时直接取均值。各层参数量由维度实时计算。最终部署的仅此网络。</figcaption></figure>
 <figure>${RLNet.svg(cartpoleMlpCfg("critic"))}<figcaption>图 4 · <strong>Critic（价值网络）</strong>的架构：隐藏层与 Actor 同构，输出改为标量价值 <strong>V(s)</strong>，即从当前状态出发的期望累计回报。仅在训练期为 Actor 提供参照，不参与部署。</figcaption></figure>
@@ -252,7 +258,7 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
   ${pr("effort_limit", "400", '执行器安全上限，对 100×动作 再作一次限幅，防止极端输出。')}
 </div>
 
-<h3 class="section-sub"><span class="hnum">3.3</span>奖励函数（5 项）</h3>
+<h3 class="section-sub"><span class="hnum">3.3</span>奖励函数</h3>
 <p>各项奖励在每个控制步按<strong>权重 × 控制步长（1/60 s）</strong>累加计入回报——权重描述的是"每秒的得分速率"而非单步得分。奖励由 <strong>1 个主要目标（alive）+ 1 个失败重罚（terminating）+ 3 个小权重塑形项</strong>组成——"主目标 + 失败重罚 + 小权重塑形"是奖励设计中十分常见的组合。五项权重的构成如图 5 所示。</p>
 <figure>
 <div class="rewards">
@@ -273,7 +279,7 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
   ${pr("pole_vel · −0.005", "joint_vel_l1", '对杆角速度的小额惩罚：目标是静态的竖直，而非快速摆动中的"平均竖直"。与上一项同为塑形项，权重同样很小。')}
 </div>
 
-<h3 class="section-sub"><span class="hnum">3.4</span>回合的终止与复位</h3>
+<h3 class="section-sub"><span class="hnum">3.4</span>终止与复位</h3>
 <div class="plist">
   ${pr("终止 · time_out", "5 s（= 300 步）", '到时正常结束（标记为非失败，不触发 terminating 惩罚）。5 秒足以判断策略是否已稳定。')}
   ${pr("终止 · 出界", "|小车| > 3.0 m", '滑轨长度有限；出界属失败终止，触发 terminating 惩罚。')}
@@ -293,7 +299,7 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
   <li><strong>返回第 1 步</strong>，循环至第 150 次迭代。</li>
 </ol>
 
-<h3 class="section-sub"><span class="hnum">3.6</span>环境与实验设置</h3>
+<h3 class="section-sub"><span class="hnum">3.6</span>环境与设置</h3>
 <p>任务环境 <code>Isaac-Cartpole-v0</code> 来自 Isaac Lab 官方任务包，按其 Manager-based 工作流（<code>ManagerBasedRLEnv</code>）组织：观测、动作、奖励、终止等要素以声明式的配置类组合定义、相互解耦——第 3.2 至 3.4 节描述的各要素即分别对应其中一块配置，本实验未作任何修改。</p>
 <p><strong>硬件与软件环境</strong>（标准环境，仅列版本，不逐条解释）</p>
 <div class="plist">
@@ -352,7 +358,7 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
 
 <h2 class="section-title"><span class="hnum">5</span>实验分析</h2>
 
-<h3 class="section-sub"><span class="hnum">5.1</span>学习过程的四个阶段</h3>
+<h3 class="section-sub"><span class="hnum">5.1</span>学习过程</h3>
 <p>将图 6 中的主曲线（回报、回合长度）与两条终止曲线对照阅读，可以清晰地看到学习过程经历了四个阶段：</p>
 <div class="plist">
   ${pr("Ⅰ · 回报先下降", "第 0–7 迭代", '回报由初始的 0.13 下降至 <b>−4.48</b>。这并非异常，而是探索阶段的正常代价：初始策略近乎随机，且探索噪声较大（σ = 1.0），小车动作杂乱，平均不到 13 步即越出边界，每次失败均触发重罚，回报因而降至最低点。此处提示了阅读强化学习曲线的一个要点：<em>训练初期回报下降并不意味着训练失败</em>。')}
@@ -361,7 +367,7 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
   ${pr("Ⅳ · 精修", "第 36–150 迭代", '此后进入精修阶段：策略进一步将杆立得更直、动作更省，回报由约 4.6 缓慢升至 4.94。整个平台期无退化、无震荡，可判定为收敛。')}
 </div>
 
-<h3 class="section-sub"><span class="hnum">5.2</span>网络内部：辅助曲线的相互印证</h3>
+<h3 class="section-sub"><span class="hnum">5.2</span>辅助指标</h3>
 <p>以上为行为层面的变化；辅助曲线则反映网络内部的状态，且多条曲线之间可相互印证：</p>
 <div class="plist">
   ${pr("Policy/mean_std", "1.0 → 0.083", '策略的探索噪声，最终仅为初值的约十二分之一。这表明策略从大范围试探逐步过渡到高确定性的执行，且其收窄进程与回报进入平台期同步——当探索不再带来增益后，策略便不再保留多余的随机性。')}
@@ -371,10 +377,10 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
   ${pr("分项奖励终值", "alive 1.0 · pole_pos −0.0072 · terminating 0", 'alive 取满值表明每一步均存活；pole_pos 的扣分收窄至接近 0，表明杆几乎全程竖直；terminating 归零，表明不再发生失败。宏观曲线与分项数据指向一致的结论。')}
 </div>
 
-<h3 class="section-sub"><span class="hnum">5.3</span>与理论上限的对照</h3>
+<h3 class="section-sub"><span class="hnum">5.3</span>理论上限</h3>
 <p>该任务的回报上限可以精确计算。按第 3.3 节的累加规则，一个满回合 5 秒内 <code>alive</code> 项至多贡献 1.0 × 5 = 5.0，其余四项均为罚项，只会向下扣减，因此理论上限为 5.0。实测值 4.94，与上限相差的 0.06 主要来自 <code>pole_pos</code> 与两项速度惩罚的微小常驻扣分——杆无法在数学意义上做到绝对竖直与绝对静止。可见策略已非常接近该任务的性能上限，继续训练的边际收益趋近于零。</p>
 
-<h3 class="section-sub"><span class="hnum">5.4</span>策略行为的定性分析</h3>
+<h3 class="section-sub"><span class="hnum">5.4</span>策略行为</h3>
 <p>为直观检验收敛策略的实际行为，以下回放由 <code>play.py</code> 加载最终检查点 <code>model_149.pt</code> 在同一环境中录制（时长 5 秒，即一个完整回合）：</p>
 <video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/cartpole-balance/frame-early.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/cartpole-balance/play-2026-07-06.mp4"></video>
 <figure>
@@ -426,16 +432,17 @@ window.RL_CONTENT["locomotion/cartpole-balance"] = `
 /* ============================= Ant 四足行走实验 ============================= */
 window.RL_CONTENT["locomotion/ant-walk"] = `
 <h1 class="page-h1">Ant 四足行走实验</h1>
-<p class="dek abstract"><strong>摘要：</strong>本实验研究四足机器人 Ant 的平地行走问题：以 8 个关节力矩为控制量，使机器人朝固定目标方向持续行走且不摔倒。方法上沿用本系列的标准算法 PPO，在 Isaac Lab 的 <code>Isaac-Ant-v0</code> 环境中以 4096 个并行环境训练一个 60→400→200→100→8 的 MLP 策略，共 1000 次迭代（约 1.31 亿步，训练循环耗时约 4.9 分钟）；并以 3 个随机种子 × 3 种配置的消融实验检验能耗惩罚与熵正则的作用。结果表明：策略平均回报由 −0.46 升至 129.9，平均回合长度达 951/960 步；回放显示策略以对角步态持续前进。与 Cartpole 不同，收敛后仍有约 7% 的回合以摔倒告终，行走任务并未被"完美"解决。</p>
+<p class="dek abstract"><strong>摘要：</strong>本实验研究四足机器人 Ant 的平地行走问题：以 8 个关节力矩为控制量，使机器人朝固定目标方向持续行走且不摔倒。方法上采用近端策略优化（PPO），在 Isaac Lab 的 <code>Isaac-Ant-v0</code> 环境中以 4096 个并行环境训练一个 60→400→200→100→8 的 MLP 策略，共 1000 次迭代（约 1.31 亿步，训练循环耗时约 4.9 分钟）；并以 3 个随机种子 × 3 种配置的消融实验检验能耗惩罚与熵正则的作用。结果表明：策略平均回报由 −0.46 升至 129.9，平均回合长度达 951/960 步；回放显示策略以对角步态持续前进。收敛后仍有约 7% 的回合以摔倒告终，说明该行走任务仍存在残余失败模式。</p>
 <div class="meta" data-exp-tags></div>
 
 <table class="kv-table">
   <caption>表 1 · 实验概要</caption>
   <tbody>
     <tr><td class="k">状态</td><td><strong>已训练 ✓</strong>　<span class="mono" style="font-family:var(--mono);font-size:13px">run 2026-07-07_08-19-22_base-s42（另有 8 个消融 run，见第 6 节）</span></td></tr>
-    <tr><td class="k">机器人</td><td>Ant（四足，8 关节）</td></tr>
+    <tr><td class="k">机器人</td><td>Ant（四足；8 个力矩驱动关节，直接 effort 执行器）</td></tr>
     <tr><td class="k">技术路线</td><td>强化学习 · PPO</td></tr>
     <tr><td class="k">任务环境</td><td><code>Isaac-Ant-v0</code>（Isaac Lab）</td></tr>
+    <tr><td class="k">任务配置</td><td>Isaac Lab 官方预设；主 run 未修改，消融 run 仅命令行覆盖单个参数（见第 6 节）</td></tr>
     <tr><td class="k">并行环境数</td><td>4096</td></tr>
     <tr><td class="k">训练迭代数</td><td>1000（单迭代 131,072 步，总计约 1.31 亿步）</td></tr>
     <tr><td class="k">训练耗时</td><td>约 4.9 分钟 / run（采集 206 s + 更新 85 s，不含仿真器启动；吞吐约 45 万步/秒）</td></tr>
@@ -447,7 +454,7 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
   </tbody>
 </table>
 
-<figure>${heroLoopSVG({ policy: "策略 π · MLP 60→400→200→100→8", env: "Isaac-Ant-v0", aDim: "⁸", sDim: "⁶⁰" })}<figcaption>图 1 · 智能体与环境的交互回路。与 Cartpole 相同的框架：策略读观测、出动作，环境返回下一观测与标量奖励；不同的是观测与动作的维度均提高了一个量级。</figcaption></figure>
+<figure>${heroLoopSVG({ policy: "策略 π · MLP 60→400→200→100→8", env: "Isaac-Ant-v0", aDim: "⁸", sDim: "⁶⁰" })}<figcaption>图 1 · 智能体与环境的交互回路。策略读入 60 维观测并输出 8 维动作，环境返回下一观测与标量奖励；训练目标是最大化累计回报。</figcaption></figure>
 
 <h2 class="section-title"><span class="hnum">1</span>背景与问题定义</h2>
 <p>本任务通过强化学习训练一个策略，使四足机器人 Ant 朝固定目标方向持续行走。被控系统如图 2 所示。</p>
@@ -456,7 +463,7 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 <p><strong>控制</strong>：策略每个控制步能做的唯一一件事，是给这 8 个关节各输出一个力矩，如图 3 所示。力矩驱动腿绕关节摆动，四条腿的摆动配合成周期性步态，机器人由此前进——从"出力矩"到"会走路"之间没有任何手写的控制器，全部由策略学出。</p>
 <figure>${antLegControlSVG()}<figcaption>图 3 · 控制量示意（侧视，放大 1 条腿）。每条腿两个主动关节——髋（<code>.*_leg</code>）与踝（<code>.*_foot</code>）——各受一个力矩 τ 驱动（弧形箭头）；4 条腿共 8 个力矩，即策略的全部输出。执行器无内置刚度与阻尼，网络输出经缩放后直接作为关节力矩（细节见第 3.2 节）。</figcaption></figure>
 <p><strong>目标</strong>：朝 +x 方向的目标点 (1000, 0, 0) 持续行走——目标足够远，等价于"一直往前走"；同时保持躯干直立不摔倒。</p>
-<p>相比 Cartpole，本任务的难度提升是本质性的：动作从 1 维升至 8 维，策略须协调 4 条腿形成周期性步态；机器人与地面的<strong>接触动力学</strong>（足端的离地、触地、摩擦）高度非线性；且"走得快"（前进奖励）与"走得稳"（不摔倒）、"走得省"（能耗惩罚）之间存在多目标权衡。这是本系列从"平衡"迈向"行走"的第一步。</p>
+<p>本任务的主要难点在于高维连续控制与接触动力学：策略须协调 4 条腿形成周期性步态；足端离地、触地与摩擦带来高度非线性的状态转移；且"走得快"（前进奖励）与"走得稳"（不摔倒）、"走得省"（能耗惩罚）之间存在多目标权衡。</p>
 <p>按 MDP 框架，问题的各要素定义见表 2：</p>
 <table class="kv-table">
   <caption>表 2 · 问题的形式化定义</caption>
@@ -472,21 +479,21 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 </table>
 
 <h2 class="section-title"><span class="hnum">2</span>理论基础</h2>
-<p>本实验沿用与 Cartpole 实验相同的方法族：任务表述为 MDP，采用 Actor-Critic 架构与 PPO 算法求解。基础概念（优势 <code>A = 实际回报 − V(s)</code>、时序差分误差 δ、GAE(λ) 聚合、策略损失 Loss/surrogate、价值损失 Loss/value、熵正则项，以及 PPO 对超界概率比裁剪其目标贡献的机制）此处不再重复推导，其定义与本页用法完全一致，详见 Cartpole 平衡实验第 2 节。</p>
-<p>值得说明的是同一套方法为何能直接迁移到难度高一个量级的任务上。策略梯度 + PPO 对任务的假设极少：只要动作连续、奖励可计算，算法本身不关心被控对象是 1 维滑轨还是 8 关节四足——复杂性被吸收进两处，一是更大的网络容量（本实验隐藏层从 32×2 升至 400/200/100），二是更多的交互数据（总步数从 983 万升至 1.31 亿）。这种"任务变难 → 加宽网络、加大数据，算法不变"的扩展方式，正是 PPO 成为机器人运动控制事实标准的核心原因，也是本系列坚持同一套算法栈的依据。</p>
-<p>与 Cartpole 的另一处不同在于回报结构：Cartpole 的奖励以存活为主，存在精确的理论上限；本任务的主奖励是<strong>前进速度</strong>（progress），走得越快回报越高，不存在可解析计算的上限。因此第 5 节的分析以多种子间的一致性（而非与理论上限的对照）作为收敛质量的定量参照。</p>
+<p>本实验将任务表述为 MDP，并采用 Actor-Critic 架构与 PPO 算法求解。优势 <code>A = 实际回报 − V(s)</code> 用于评估动作相对 Critic 预期的好坏；GAE(λ) 将多步时序差分误差聚合为更稳定的优势估计；PPO 通过裁剪新旧策略概率比，限制单次更新幅度，降低步态突然崩溃的风险。</p>
+<p>PPO 对任务的假设较少：只要动作连续、奖励可计算，复杂性主要由网络容量与交互数据量吸收。本实验采用 400/200/100 的隐藏层宽度，并以约 1.31 亿步交互数据训练策略；这种以大规模并行采样支撑 on-policy 更新的方式，是 PPO 在机器人运动控制中常用的实践路径。</p>
+<p>本任务的主奖励是<strong>前进速度</strong>（progress），走得越快回报越高，不存在可解析计算的回报上限。因此第 5 节的分析以多种子间的一致性与消融对照作为收敛质量的定量参照。</p>
 
 <h2 class="section-title"><span class="hnum">3</span>实验框架</h2>
 <p>本节完整描述本实验的构成：策略由两个神经网络组成（3.1），读入 60 维观测、输出 8 维关节力矩（3.2），其行为由 7 项奖励塑造（3.3），回合的起止方式见 3.4，PPO 训练流程见 3.5，运行环境与全部超参数见 3.6。</p>
 
-<h3 class="section-sub"><span class="hnum">3.1</span>网络结构（Actor-Critic）</h3>
-<p>Actor 与 Critic 仍为同构 MLP（60→400→200→100→输出，ELU 激活），架构分别如图 4 与图 5 所示。相比 Cartpole 的 32×2 隐藏层，网络加宽加深以匹配 60 维观测与 8 维动作的表达需求：Actor 125,516 个参数（含 8 个可学习的动作标准差）、Critic 124,801 个，合计 250,317 个（实测自检查点文件），约为 Cartpole 网络的 100 倍。</p>
+<h3 class="section-sub"><span class="hnum">3.1</span>网络结构</h3>
+<p>Actor 与 Critic 仍为同构 MLP（60→400→200→100→输出，ELU 激活），架构分别如图 4 与图 5 所示。网络容量需要匹配 60 维观测与 8 维动作的表达需求：Actor 125,516 个参数（含 8 个可学习的动作标准差）、Critic 124,801 个，合计 250,317 个（实测自检查点文件），属于小型但足够表达该任务策略的 MLP。</p>
 <figure>${RLNet.svg(antMlpCfg("actor"))}<figcaption>图 4 · <strong>Actor（策略网络）</strong>的架构：60 维观测经三个 ELU 隐藏层映射为 8 维动作均值 <strong>μ</strong>；μ 与逐维可学习的 logσ 共同构成高斯策略 <strong>N(μ, σ²)</strong>——训练时从中采样以探索，部署时直接取均值。各层参数量由维度实时计算。最终部署的仅此网络。</figcaption></figure>
 <figure>${RLNet.svg(antMlpCfg("critic"))}<figcaption>图 5 · <strong>Critic（价值网络）</strong>的架构：隐藏层与 Actor 同构，末层输出改为 1 维的标量价值 <strong>V(s)</strong>。仅在训练期为 Actor 提供参照，不参与部署。</figcaption></figure>
 <div class="plist">
   ${pr("actor_hidden_dims", "[400, 200, 100]", '官方为该任务配置的容量：60 维输入、8 维输出，且需在网络内部隐式形成步态协调，32×2 量级的小网络不再够用。金字塔形逐层收窄是常见做法。')}
   ${pr("critic_hidden_dims", "[400, 200, 100]", '与 Actor 同构（对称 Actor-Critic），本任务状态完全可观。')}
-  ${pr("activation", "elu", '与 Cartpole 相同的选择（负半区平滑、避免神经元失活），沿用不再展开。')}
+  ${pr("activation", "elu", '负半区平滑，可降低神经元长期失活风险，是连续控制 MLP 的常见选择。')}
   ${pr("init_noise_std", "1.0", '初始探索噪声：8 维动作各自带可学习标准差，初值 1.0；本次实测 Policy/mean_std 由 0.99 收至 0.042。')}
   ${pr("obs normalization", "False", '观测不作在线归一化，与官方默认一致；60 维观测中足端力已按 0.1、关节速度已按 0.2 预缩放（见 3.2）。')}
 </div>
@@ -511,19 +518,19 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
   </tbody>
 </table>
 <div class="plist">
-  ${pr("观测噪声", "无", 'enable_corruption = False，与 Cartpole 一致：本阶段不为感知加难度。')}
+  ${pr("观测噪声", "无", 'enable_corruption = False：本实验聚焦基础步态学习，不额外加入感知噪声。')}
   ${pr("为何有足端力", "接触信息", '行走的本质是管理与地面的接触；足端六维力让策略直接观测到触地时序与支撑力分布，是步态形成的关键输入。')}
   ${pr("为何有上步动作", "动作连续性", '力矩控制下，策略若能看到自己上一步的输出，更容易学出平滑、周期性的动作序列。')}
 </div>
 <p><strong>动作空间（8 维）。</strong>策略在每个控制步输出 8 个标量：</p>
 <div class="plist">
-  ${pr("驱动对象", "全部 8 关节", '4 髋 + 4 踝全部主动驱动（对比 Cartpole 的欠驱动：本任务是全驱动的，难点在协调而非欠驱动）。')}
+  ${pr("驱动对象", "全部 8 关节", '4 髋 + 4 踝全部主动驱动；任务难点主要在多腿协调、接触节律与稳定性权衡。')}
   ${pr("控制方式", "JointEffortAction", '直接输出关节力矩，不经 PD 环；执行器 stiffness=0、damping=0，策略需自行学出稳定的力矩序列。')}
   ${pr("scale", "7.5", '网络输出量级约 N(0,1)，×7.5 放大到该机器人关节的合理力矩量级。')}
 </div>
 
-<h3 class="section-sub"><span class="hnum">3.3</span>奖励函数（7 项）</h3>
-<p>各项奖励仍按<strong>权重 × 控制步长（1/60 s）</strong>逐步累加（terminating 类事件奖励除外，本任务没有该类项）。构成为 <strong>1 个主目标（progress，前进）+ 3 个正向辅助（alive / upright / move_to_target）+ 3 个正则惩罚（action_l2 / energy / joint_pos_limits）</strong>——相比 Cartpole 的"主目标 + 失败重罚 + 塑形"，本任务用持续的姿态/朝向奖励替代了一次性失败重罚。七项权重的构成如图 6 所示。</p>
+<h3 class="section-sub"><span class="hnum">3.3</span>奖励函数</h3>
+<p>各项奖励按<strong>权重 × 控制步长（1/60 s）</strong>逐步累加。奖励构成为 <strong>1 个主目标（progress，前进）+ 3 个正向辅助（alive / upright / move_to_target）+ 3 个正则惩罚（action_l2 / energy / joint_pos_limits）</strong>；姿态、朝向与能耗项共同约束步态质量。七项权重的构成如图 6 所示。</p>
 <figure>
 <div class="rewards">
   <div class="rw"><span class="nm">progress<small>朝目标前进的速度</small></span><span class="bar"><i class="p" style="width:50%"></i></span><span class="w p">+1.0</span></div>
@@ -547,11 +554,11 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
   ${pr("action_l2 · −0.005", "action_l2", '动作幅值的小额 L2 正则，与 energy 协同使动作平滑，权重刻意最小。')}
 </div>
 
-<h3 class="section-sub"><span class="hnum">3.4</span>回合的终止与复位</h3>
+<h3 class="section-sub"><span class="hnum">3.4</span>终止与复位</h3>
 <div class="plist">
   ${pr("终止 · time_out", "16 s（= 960 步）", '到时正常结束（非失败）。16 秒足以走出数十米、充分暴露步态质量。')}
   ${pr("终止 · 摔倒", "躯干高度 < 0.31 m", '躯干贴地即判摔倒，失败终止。这是行走任务最直接的失败判据。')}
-  ${pr("复位 · 根位姿", "不随机", '每回合从默认位姿（原点、高度 0.5 m）开始——与 Cartpole 不同，本任务的多样性来自关节噪声与漫长回合本身。')}
+  ${pr("复位 · 根位姿", "不随机", '每回合从默认位姿（原点、高度 0.5 m）开始；状态多样性主要来自关节噪声与长回合中的接触演化。')}
   ${pr("复位 · 关节位置", "± 0.2 rad", '关节角加均匀噪声，避免策略记忆单一起步动作。')}
   ${pr("复位 · 关节速度", "± 0.1 rad/s", '关节速度加小幅噪声，进一步增加起始多样性。')}
 </div>
@@ -565,9 +572,9 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
   <li><strong>返回第 1 步</strong>，循环至第 1000 次迭代。</li>
 </ol>
 
-<h3 class="section-sub"><span class="hnum">3.6</span>环境与实验设置</h3>
-<p>任务环境 <code>Isaac-Ant-v0</code> 来自 Isaac Lab 官方任务包，与 Cartpole 相同按 Manager-based 工作流组织（各要素为声明式配置、相互解耦），本实验的主 run 未对官方配置作任何修改；消融 run 仅经命令行覆盖单个参数（第 6 节）。</p>
-<p><strong>硬件与软件环境</strong>（与 Cartpole 实验相同的标准环境，仅列版本）</p>
+<h3 class="section-sub"><span class="hnum">3.6</span>环境与设置</h3>
+<p>任务环境 <code>Isaac-Ant-v0</code> 来自 Isaac Lab 官方任务包，按 Manager-based 工作流组织（各要素为声明式配置、相互解耦）。本实验的主 run 未对官方配置作任何修改；消融 run 仅经命令行覆盖单个参数（第 6 节）。</p>
+<p><strong>硬件与软件环境</strong>（标准环境，仅列版本）</p>
 <div class="plist">
   ${kv("GPU", "NVIDIA RTX 5070 Ti · 16 GB")}
   ${kv("操作系统", "Ubuntu 24.04.4 LTS")}
@@ -577,24 +584,24 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 </div>
 <p><strong>Rollout（经验收集）</strong></p>
 <div class="plist">
-  ${pr("num_envs", "4096", '并行环境数，与 Cartpole 相同；Ant 单步物理开销更大，实测吞吐约 45 万步/秒（Cartpole 约 60 万）。')}
-  ${pr("num_steps_per_env", "32", '每迭代每环境 32 步（Cartpole 为 16）：行走的回报结构比平衡更长程，更长的片段有利于优势估计。')}
+  ${pr("num_envs", "4096", '并行环境数；Ant 单步物理开销较高，实测吞吐约 45 万步/秒。')}
+  ${pr("num_steps_per_env", "32", '每迭代每环境 32 步；较长片段有利于估计行走任务中的长程优势。')}
   ${pr("episode_length_s", "16 s", '回合时长，换算为 960 个控制步。')}
-  ${pr("sim.dt", "1/120 s", '物理步长 120 Hz，与 Cartpole 相同。')}
-  ${pr("decimation", "2", '控制频率 60 Hz，与 Cartpole 相同。')}
+  ${pr("sim.dt", "1/120 s", '物理步长 120 Hz。')}
+  ${pr("decimation", "2", '控制频率 60 Hz。')}
   ${pr("max_iterations", "1000", '官方默认值。本次回报在后半程仍缓慢爬升（见第 5.1 节），1000 迭代取的是"足够好"而非"完全平台化"。')}
 </div>
-<p><strong>PPO 算法超参数</strong>（与 Cartpole 相同者从简，机制见其报告第 2 节）</p>
+<p><strong>PPO 算法超参数</strong></p>
 <div class="plist">
   ${pr("clip_param", "0.2", '裁剪半径，论文默认。')}
   ${pr("gamma (γ)", "0.99", '有效视界 ≈ 100 步 ≈ 1.7 秒，覆盖一个步态周期绰绰有余。')}
   ${pr("lam (GAE λ)", "0.95", '社区通用折中。')}
-  ${pr("entropy_coef", "0.0", '与 Cartpole（0.005）不同，官方为本任务关闭了熵正则。这一差异是否重要，正是第 6 节消融的检验对象之一。')}
+  ${pr("entropy_coef", "0.0", '官方配置关闭熵正则；第 6 节用消融实验检验该选择对本任务的影响。')}
   ${pr("value_loss_coef", "1.0", '两项损失等权。')}
   ${pr("num_learning_epochs", "5", '同批数据学 5 遍。')}
   ${pr("num_mini_batches", "4", '每份 32,768 条。')}
-  ${pr("learning_rate", "5e-4", '初始学习率（Cartpole 为 1e-3）：网络大 100 倍，起步更保守。实际步长由 adaptive 调度接管。')}
-  ${pr("schedule / desired_kl", "adaptive / 0.01", '按 KL 距离自动调节学习率，机制同 Cartpole。')}
+  ${pr("learning_rate", "5e-4", '初始学习率；实际步长由 adaptive 调度接管。')}
+  ${pr("schedule / desired_kl", "adaptive / 0.01", '按 KL 距离自动调节学习率，限制单次策略更新幅度。')}
   ${pr("max_grad_norm", "1.0", '梯度范数裁剪。')}
   ${pr("optimizer", "Adam", 'RSL-RL 默认。')}
   ${pr("seed", "42（主 run）", '消融批次另用 43 / 44，共 3 个种子（第 6 节）。')}
@@ -604,7 +611,7 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
   ${pr("主指标 · 平均回报", "Train/mean_reward", '衡量策略整体表现；本任务无精确理论上限，以多种子一致性与消融对照作定量参照（第 5.3 / 6 节）。')}
   ${pr("主指标 · 回合长度", "Train/mean_episode_length", '满值 960 步；不足部分对应摔倒终止的回合。')}
   ${pr("辅助 · 终止方式占比", "Episode_Termination/*", '摔倒（torso_height）与到时（time_out）的占比，直接给出"摔倒率"。')}
-  ${pr("辅助 · 探索与损失", "Policy/mean_std · Loss/*", '含义同 Cartpole 报告。')}
+  ${pr("辅助 · 探索与损失", "Policy/mean_std · Loss/*", '用于监控动作分布收缩、价值拟合与策略更新稳定性。')}
 </div>
 <p><strong>复现命令</strong>（主 run；消融 run 的覆盖参数见第 6 节表 4）</p>
 <pre>cd /home/jeff/IsaacLab
@@ -621,21 +628,21 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 
 <h2 class="section-title"><span class="hnum">5</span>实验分析</h2>
 
-<h3 class="section-sub"><span class="hnum">5.1</span>学习过程的三个阶段</h3>
+<h3 class="section-sub"><span class="hnum">5.1</span>学习过程</h3>
 <p>将图 7 中的主曲线与终止占比曲线对照阅读，本次学习大致分为三个阶段：</p>
 <div class="plist">
   ${pr("Ⅰ · 先学会不摔", "第 0–43 迭代", '回报先降至 <b>−5.73</b>（第 20 迭代）：随机力矩下正则惩罚全额扣分而前进为零。但回合长度以极快速度改善——第 31 迭代平均已超 900 步。值得注意的是摔倒占比在第 50 迭代前后达到峰值约 17%：策略先学会的是"不乱动就不容易摔"，而非行走。回报在第 43 迭代转正过 10。')}
   ${pr("Ⅱ · 学会行走", "第 43–181 迭代", '回报进入快速上升期：第 76 迭代过 50，第 181 迭代过 100。这一阶段 progress 项成为回报主体——策略从"站住"过渡到"向前走"，摔倒占比同步回落至约 10%。')}
-  ${pr("Ⅲ · 步态精修", "第 181–1000 迭代", '回报由 100 缓慢爬升至 129.9（第 444 迭代过 120；第 500 → 999 迭代仍有约 +18）。<em>与 Cartpole 不同，本任务到预算耗尽仍未完全平台化</em>——前进速度没有硬上限，更多训练仍可能换来更快的步态。摔倒占比稳定在 6–7%，未随回报继续下降：更快的行走与残余摔倒风险并存。')}
+  ${pr("Ⅲ · 步态精修", "第 181–1000 迭代", '回报由 100 缓慢爬升至 129.9（第 444 迭代过 120；第 500 → 999 迭代仍有约 +18）。<em>本任务到预算耗尽仍未完全平台化</em>——前进速度没有硬上限，更多训练仍可能换来更快的步态。摔倒占比稳定在 6–7%，未随回报继续下降：更快的行走与残余摔倒风险并存。')}
 </div>
 
-<h3 class="section-sub"><span class="hnum">5.2</span>网络内部：辅助曲线的相互印证</h3>
+<h3 class="section-sub"><span class="hnum">5.2</span>辅助指标</h3>
 <div class="plist">
-  ${pr("Policy/mean_std", "0.99 → 0.042", '8 维动作的平均探索噪声收窄至初值的约 1/24，节奏与回报增速放缓同步——与 Cartpole 相同的"探索红利耗尽后收敛"模式，收得更深（Cartpole 收至 0.083）。')}
+  ${pr("Policy/mean_std", "0.99 → 0.042", '8 维动作的平均探索噪声收窄至初值的约 1/24，节奏与回报增速放缓同步，表明策略逐渐转向确定性执行。')}
   ${pr("Loss/entropy", "11.31 → −18.21", '8 维对角高斯的熵 = Σln σᵢ + 8×½ln(2πe) ≈ Σln σᵢ + 11.35。初始 σᵢ≈1 时熵恰为常数项 11.35（实测 11.31，吻合）；随各维 σ 收窄，熵转深负。仍是"分布高度集中"的佐证。')}
   ${pr("Episode_Reward 分项终值", "progress 8.45 · alive 0.48 · move_to_target 0.48", '分项为"每秒得分速率"：progress 8.45/s 占绝对主体（对应稳定前进速度），alive 与 move_to_target 接近各自权重上限（0.5），upright 0.095 ≈ 上限 0.1——姿态与朝向目标基本被满足。')}
   ${pr("正则项终值", "energy −1.29 · joint_pos_limits −0.34 · action_l2 −0.02", 'energy 是最大的常驻扣分（行走本身耗能，不可能归零）；joint_pos_limits 仍有 −0.34，说明步态中存在贴限位的动作，是后续可优化的信号。')}
-  ${pr("Episode_Termination", "torso_height 占比 ~6.6%（末段）", '收敛后每 15 个回合仍约有 1 个以摔倒告终。这与 Cartpole 的"零失败"形成对照：行走的失败模式没有被彻底消除，只是被压低——策略鲁棒性的天花板将在后续任务中用域随机化等手段冲击。')}
+  ${pr("Episode_Termination", "torso_height 占比 ~6.6%（末段）", '收敛后每 15 个回合仍约有 1 个以摔倒告终。行走失败模式没有被彻底消除，只是被压低；鲁棒性仍需通过独立评估和域随机化进一步验证。')}
 </div>
 
 <h3 class="section-sub"><span class="hnum">5.3</span>多种子稳定性</h3>
@@ -645,7 +652,7 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 <figcaption>图 8 · 基线配置 3 个随机种子的回报曲线（Train/mean_reward）。三条曲线以线型区分，形态与终值高度一致。</figcaption>
 </figure>
 
-<h3 class="section-sub"><span class="hnum">5.4</span>策略行为的定性分析</h3>
+<h3 class="section-sub"><span class="hnum">5.4</span>策略行为</h3>
 <p>以下回放由跟随镜头录制（加载主 run 最终检查点 <code>model_999.pt</code>，时长 16 秒即一个完整回合；镜头随机器人移动，地面网格的流动反映实际前进）：</p>
 <video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/ant-walk/frame-mid.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/ant-walk/play-16s.mp4"></video>
 <figure>
@@ -657,7 +664,7 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 <figcaption>图 9 · 收敛策略的行走序列（自回放视频抽帧，跟随镜头）。三个时刻躯干均保持撑起，四腿处于步态周期的不同相位。</figcaption>
 </figure>
 <p>如图 9 所示，策略全程保持躯干撑起、四腿交替支撑前进，未出现拖行或翻倒；视频中可见其以近似对角交替的方式协调四腿、朝固定方向持续行走。</p>
-<p><strong>60 秒耐力测试。</strong>与 Cartpole 实验相同的做法：将回合长度覆盖为 60 秒（<code>env.episode_length_s=60.0</code>，仅评估用）录制加时回放，检验长时间行走的持续性：</p>
+<p><strong>60 秒耐力测试。</strong>评估时将回合长度覆盖为 60 秒（<code>env.episode_length_s=60.0</code>，仅评估用）录制加时回放，检验长时间行走的持续性：</p>
 <video width="960" height="540" controls muted loop playsinline preload="metadata" poster="assets/media/ant-walk/frame-e35.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/ant-walk/play-endurance-60s.mp4"></video>
 <figure>
 <div class="frames">
@@ -704,19 +711,19 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
 <h2 class="section-title"><span class="hnum">7</span>局限性</h2>
 <p>本报告存在四点局限：</p>
 <ul>
-  <li><strong>直接读取训练曲线。</strong>与 Cartpole 实验相同，未设置独立评估流程（固定初始状态、关闭探索噪声、多回合统计）；独立评估管线仍待建设。</li>
+  <li><strong>直接读取训练曲线。</strong>本报告未设置独立评估流程（固定初始状态、关闭探索噪声、多回合统计）；独立评估管线仍待建设。</li>
   <li><strong>无域随机化与外部扰动。</strong>平地、无推搡、无参数随机化，摔倒率 7% 是"温室"条件下的数字；鲁棒性将在 G1 地形任务中用域随机化正面处理。</li>
   <li><strong>消融覆盖有限。</strong>仅两个单参数、单一训练预算、n=3 种子；结论的外推（更长训练、其他任务）需进一步验证。</li>
   <li><strong>定性分析基于单次回放。</strong>60 秒不摔为单样本证据，与训练统计中 7% 的摔倒率并存，不应过度解读。</li>
 </ul>
-<p>相比 Cartpole 报告，"单种子单次运行"的局限已由本实验的 3 种子设计解决。</p>
+<p>3 种子设计缓解了单次运行偶然性的局限，但样本量仍然较小。</p>
 
 <h2 class="section-title"><span class="hnum">8</span>结论与未来工作</h2>
-<p><strong>结论。</strong>PPO 在 1000 次迭代（约 1.31 亿步、单 run 训练循环约 4.9 分钟）内学会了 Ant 的四足行走：平均回报 129.9、回合长度 951/960，跟随镜头回放确认稳定的交替步态，60 秒加时行走未摔倒；3 种子重复实验（120.4 ± 3.2）表明结果稳健。消融给出两条有实证支撑的结论：能耗惩罚是速度与稳定性/能耗之间的显式权衡（移除后速度 +51% 但摔倒率翻倍）；熵正则在本任务显著有益（+30% 回报且不损稳定性），官方默认关闭并非最优。与 Cartpole 的"完美解决"不同，本任务收敛后仍有约 7% 的摔倒率、回报仍在缓慢爬升——行走问题的难度长尾开始显现。</p>
+<p><strong>结论。</strong>PPO 在 1000 次迭代（约 1.31 亿步、单 run 训练循环约 4.9 分钟）内学会了 Ant 的四足行走：平均回报 129.9、回合长度 951/960，跟随镜头回放确认稳定的交替步态，60 秒加时行走未摔倒；3 种子重复实验（120.4 ± 3.2）表明结果稳健。消融给出两条有实证支撑的结论：能耗惩罚是速度与稳定性/能耗之间的显式权衡（移除后速度 +51% 但摔倒率翻倍）；熵正则在本任务显著有益（+30% 回报且不损稳定性），官方默认关闭并非最优。本任务收敛后仍有约 7% 的摔倒率，且回报仍在缓慢爬升；行走问题的难度长尾开始显现。</p>
 <p><strong>未来工作。</strong>下一个实验为 <em>G1 人形平地行走</em>：从四足到双足，稳定裕度大幅缩小，并将引入速度指令跟踪（不再是单向冲刺）。熵正则的发现与独立评估管线将在该实验中落实。</p>
 
 <h2 class="section-title appendix">附录 · 关于本报告</h2>
-<p><strong>理论深度。</strong>本报告的理论仅陈述至读懂实验所需的程度，基础概念沿用 Cartpole 平衡实验第 2 节的定义；完整推导参阅下列文献。</p>
+<p><strong>理论深度。</strong>本报告的理论仅陈述至读懂实验所需的程度；PPO、GAE 与连续控制的完整推导参阅下列文献。</p>
 <p><strong>数据来源。</strong>全部配置数值取自 Isaac Lab 2.3.2 源码与 run 目录的参数快照；曲线与统计来自 9 个真实 run 的本地 TensorBoard 事件文件（主 run <span class="mono" style="font-family:var(--mono);font-size:13px">2026-07-07_08-19-22_base-s42</span>；消融批次 base-s43/s44、noenergy-s42/43/44、entropy-s42/43/44，均为 2026-07-07 同机连续训练）；训练耗时与参数量分别实测自事件文件与检查点 <code>model_999.pt</code>；回放视频由跟随镜头版 play 脚本录制。均未作人工修饰。</p>
 <p><strong>参考文献。</strong></p>
 <ol>
@@ -727,3 +734,306 @@ window.RL_CONTENT["locomotion/ant-walk"] = `
   <li>R. S. Sutton, A. G. Barto. <em>Reinforcement Learning: An Introduction</em> (2nd ed.). MIT Press, 2018.（强化学习标准教科书）</li>
 </ol>
 `;
+
+/* ============================= G1 平地行走 ============================= */
+function g1MlpCfg(kind) {
+  var actor = kind !== "critic";
+  return {
+    aria: (actor ? "Actor" : "Critic") + " 网络架构（G1 flat）",
+    markerId: actor ? "mkNetG1A" : "mkNetG1C",
+    input: { label: "观测 s ∈ ℝ¹²³", items: ["躯干速度 ·6", "重力投影 ·3", "速度命令 ·3", "关节位置 ·37", "关节速度 ·37", "上步动作 ·37"] },
+    layers: [
+      { type: "fc", in: 123, out: 256, act: "ELU" },
+      { type: "fc", in: 256, out: 128, act: "ELU" },
+      { type: "fc", in: 128, out: 128, act: "ELU" },
+      { type: "fc", in: 128, out: actor ? 37 : 1, act: "线性" }
+    ],
+    head: actor ? { type: "gaussian", dim: 37 } : { type: "value" }
+  };
+}
+function g1HumanoidSVG() {
+  var s = "";
+  s += '<path class="vb" d="M80 220 H740"/><text class="sb" x="120" y="240" text-anchor="middle">平地 plane</text>';
+  s += '<circle class="nd io" cx="305" cy="58" r="20"/><path class="ar" style="stroke-width:7;stroke-linecap:round" d="M305 80 L305 145"/>';
+  s += '<path class="ar" style="stroke-width:5;stroke-linecap:round" d="M305 98 L255 132 M305 98 L355 132"/>';
+  s += '<path class="ar" style="stroke-width:5;stroke-linecap:round" d="M305 145 L270 215 M305 145 L340 215"/>';
+  s += '<circle class="mk" cx="270" cy="215" r="5"/><circle class="mk" cx="340" cy="215" r="5"/>';
+  s += '<path class="eg" d="M325 102 L415 86"/><text class="sb" x="424" y="90" text-anchor="start">torso_link：躯干接触即失败终止</text>';
+  s += '<path class="ar" d="M430 155 H690" marker-end="url(#mkG1Sys)"/><text class="lb" x="560" y="136" text-anchor="middle">速度命令 c = (vₓ, vᵧ, ωz)</text>';
+  s += '<text class="sb" x="560" y="178" text-anchor="middle">训练范围：vₓ∈[0,1] m/s，vᵧ∈[-0.5,0.5] m/s，ωz∈[-1,1] rad/s</text>';
+  s += '<text class="sb" x="115" y="52" text-anchor="start">Unitree G1 · 37 个受控关节 · 50 Hz 关节位置目标</text>';
+  return '<svg viewBox="0 0 820 256" role="img" aria-label="G1 平地速度跟踪任务示意"><defs><marker id="mkG1Sys" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' + s + '</svg>';
+}
+function g1ControlSVG() {
+  var s = "";
+  s += '<text class="sb" x="36" y="28" text-anchor="start">侧视示意 · 控制量落到 G1 的 37 个受控关节</text>';
+  /* left: policy action to joint-position targets */
+  s += '<rect class="nd" x="42" y="62" rx="7" width="138" height="72"/>';
+  s += '<text class="lb" x="111" y="92" text-anchor="middle">Actor π</text><text class="sb" x="111" y="116" text-anchor="middle">a ∈ ℝ³⁷</text>';
+  s += '<path class="ar" d="M184 98 H275" marker-end="url(#mkG1Ctl)"/><text class="sb" x="230" y="82" text-anchor="middle">逐关节动作</text>';
+  s += '<rect class="nd io" x="282" y="62" rx="7" width="168" height="72"/>';
+  s += '<text class="lb" x="366" y="90" text-anchor="middle">关节位置目标</text><text class="sb" x="366" y="114" text-anchor="middle">q* = q₀ + 0.5a</text>';
+  s += '<path class="ar" d="M454 98 H535" marker-end="url(#mkG1Ctl)"/><text class="sb" x="494" y="82" text-anchor="middle">qᵢ* 落到关节</text>';
+
+  /* humanoid skeleton */
+  s += '<circle class="nd io" cx="620" cy="56" r="18"/>';
+  s += '<path class="ar" style="stroke-width:7;stroke-linecap:round" d="M620 76 L620 146"/>';
+  s += '<path class="ar" style="stroke-width:5;stroke-linecap:round" d="M620 96 L570 128 M620 96 L670 128"/>';
+  s += '<path class="ar" style="stroke-width:5;stroke-linecap:round" d="M620 146 L584 214 L568 288 M620 146 L656 214 L672 288"/>';
+  s += '<path class="ar" style="stroke-width:4;stroke-linecap:round" d="M570 128 L548 178 M670 128 L692 178"/>';
+  s += '<path class="ar" style="stroke-width:3;stroke-linecap:round" d="M548 178 L534 200 M548 178 L548 204 M548 178 L562 200 M692 178 L678 200 M692 178 L692 204 M692 178 L706 200"/>';
+
+  /* controlled joint markers */
+  var pts = [
+    [620,96,'torso_joint'],
+    [584,214,'left knee / ankle chain'], [568,288,'left ankle'], [656,214,'right knee / ankle chain'], [672,288,'right ankle'],
+    [584,146,'left hip'], [656,146,'right hip'],
+    [570,128,'left shoulder'], [548,178,'left elbow'], [670,128,'right shoulder'], [692,178,'right elbow'],
+    [534,200,'left fingers'], [548,204,'left fingers'], [562,200,'left fingers'], [678,200,'right fingers'], [692,204,'right fingers'], [706,200,'right fingers']
+  ];
+  pts.forEach(function (p) { s += '<circle class="ctl" cx="' + p[0] + '" cy="' + p[1] + '" r="5"><title>' + p[2] + '</title></circle>'; });
+
+  /* target-position arrows to joint groups */
+  s += '<path class="tar" d="M540 118 C566 105 590 100 615 98" marker-end="url(#mkQ)"/>';
+  s += '<path class="tar" d="M540 138 C555 166 570 188 584 212" marker-end="url(#mkQ)"/>';
+  s += '<path class="tar" d="M540 158 C575 166 620 162 656 146" marker-end="url(#mkQ)"/>';
+  s += '<path class="tar" d="M540 178 C570 180 655 182 692 178" marker-end="url(#mkQ)"/>';
+  s += '<text class="lb" x="764" y="94" text-anchor="middle">控制量</text>';
+  s += '<text class="sb" x="764" y="120" text-anchor="middle">37 个 qᵢ* 位置目标</text>';
+  s += '<text class="sb" x="764" y="144" text-anchor="middle">腿 12 · 躯干 1 · 臂 10 · 手指 14</text>';
+  s += '<text class="sb" x="764" y="176" text-anchor="middle">隐式 PD/电机根据 qᵢ*</text>';
+  s += '<text class="sb" x="764" y="198" text-anchor="middle">在物理仿真中产生 τᵢ</text>';
+
+  /* curved arcs: generated torques, not direct policy outputs */
+  s += '<path class="tau" d="M574 133 C556 120 558 102 574 94" marker-end="url(#mkTauG1)"/><text class="sb" x="548" y="96" text-anchor="end">τᵢ</text>';
+  s += '<path class="tau" d="M648 133 C666 120 664 102 648 94" marker-end="url(#mkTauG1)"/><text class="sb" x="690" y="96" text-anchor="start">τᵢ</text>';
+  s += '<path class="tau" d="M584 232 C566 224 563 207 578 197" marker-end="url(#mkTauG1)"/>';
+  s += '<path class="tau" d="M656 232 C674 224 677 207 662 197" marker-end="url(#mkTauG1)"/>';
+
+  s += '<text class="sb" x="410" y="332" text-anchor="middle">策略只给关节位置目标；没有手写步态控制器。站立、摆腿、接触节律与速度跟踪由 PPO 策略和物理闭环共同形成。</text>';
+  return '<svg viewBox="0 0 860 350" role="img" aria-label="G1 控制量示意：37 维关节位置目标落到受控关节">' +
+    '<defs><marker id="mkG1Ctl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker>' +
+    '<marker id="mkQ" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path style="fill:var(--accent)" d="M0 0L10 5L0 10z"/></marker>' +
+    '<marker id="mkTauG1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path style="fill:var(--ink-3)" d="M0 0L10 5L0 10z"/></marker></defs>' +
+    '<style>.ctl{fill:var(--accent);stroke:var(--paper);stroke-width:2}.tar{stroke:var(--accent);stroke-width:1.8;fill:none}.tau{stroke:var(--ink-3);stroke-width:1.4;fill:none;stroke-dasharray:3 3}</style>' + s + '</svg>';
+}
+window.RL_CONTENT["locomotion/g1-flat"] = `
+<h1 class="page-h1">G1 平地行走</h1>
+<p class="dek abstract"><strong>摘要：</strong>本实验研究 Unitree G1 人形机器人在 Isaac Lab 官方 <code>Isaac-Velocity-Flat-G1-v0</code> 任务中的平地速度跟踪。方法上保持官方任务源码不变，以 RSL-RL PPO 训练 2 个条件 × 3 个随机种子：官方默认 <code>entropy_coef=0.008</code> 与命令行覆盖 <code>entropy_coef=0.005</code>。6 个正式 run 均训练 1500 次迭代、每 run 约 1.47 亿步仿真。结果显示，在本训练预算下，较低熵系数的末 100 迭代平均回报为 <strong>30.40 ± 0.60</strong>，高于默认组的 <strong>28.04 ± 0.14</strong>；yaw 速度误差由 <strong>0.464</strong> 降至 <strong>0.392</strong>，但躯干接触终止占比未同步下降。最佳候选策略来自 <code>entropy=0.005</code>、seed 43，已导出 <code>policy.pt</code> 与 <code>policy.onnx</code>，并录制约 10 秒与 60 秒跟随镜头回放。</p>
+<div class="meta" data-exp-tags></div>
+
+<table class="kv-table">
+  <caption>表 1 · 实验概要</caption>
+  <tbody>
+    <tr><td class="k">状态</td><td><strong>已训练 ✓</strong>　6 个正式 run</td></tr>
+    <tr><td class="k">机器人</td><td>Unitree G1 minimal（37 个受控关节；隐式 PD 关节位置执行器）</td></tr>
+    <tr><td class="k">技术路线</td><td>强化学习 · PPO · RSL-RL</td></tr>
+    <tr><td class="k">任务环境</td><td><code>Isaac-Velocity-Flat-G1-v0</code>（Isaac Lab 官方 Manager-based 任务）</td></tr>
+    <tr><td class="k">任务配置</td><td>baseline：Isaac Lab 官方预设（未修改）；entropy=0.005：官方预设 + 命令行覆盖 <code>agent.algorithm.entropy_coef=0.005</code></td></tr>
+    <tr><td class="k">并行环境数</td><td>4096</td></tr>
+    <tr><td class="k">迭代 / 步数</td><td>1500 次迭代；每迭代 4096×24 步；单 run 约 147,456,000 步</td></tr>
+    <tr><td class="k">真实训练耗时</td><td>6 个正式 run 合计约 8038 秒（2.23 小时）；单 run 约 21.7–23.6 分钟</td></tr>
+    <tr><td class="k">观测 / 动作维度</td><td>123 维 → 37 维</td></tr>
+    <tr><td class="k">策略网络</td><td>Actor 123→256→128→128→37；Critic 123→256→128→128→1；Actor+Critic 合计 167,243 个参数</td></tr>
+    <tr><td class="k">最佳候选</td><td><code>entropy=0.005, seed=43</code>：末 100 迭代回报 30.90，base_contact 0.38%，导出 JIT/ONNX</td></tr>
+  </tbody>
+</table>
+
+<figure>${heroLoopSVG({ policy: "PPO Actor-Critic · 123→…→37", env: "Isaac-Velocity-Flat-G1-v0", aDim: "³⁷", sDim: "¹²³" })}<figcaption>图 1 · G1 平地速度跟踪任务的智能体–环境交互回路。策略接收本体观测与速度命令，输出 37 维关节位置动作；环境返回下一步观测、奖励与终止信号。</figcaption></figure>
+
+<h2 class="section-title"><span class="hnum">1</span>背景与问题定义</h2>
+<p>本任务要求 G1 在平地上跟踪随机采样的底盘速度命令。系统与任务目标如图 2 所示：机器人需要在不让躯干接触地面的前提下，跟踪前进、侧向与 yaw 角速度命令。</p>
+<figure>${g1HumanoidSVG()}<figcaption>图 2 · G1 平地速度跟踪任务示意。命令由 <code>base_velocity</code> 生成，平地任务去除了高度扫描与地形 curriculum；躯干 <code>torso_link</code> 发生非法接触时回合失败终止。</figcaption></figure>
+<p><strong>机器人</strong>：Unitree G1 minimal 资产，共 37 个受控关节。关节构成为：双腿 12 个（每侧 <code>hip_yaw</code> / <code>hip_roll</code> / <code>hip_pitch</code> / <code>knee</code> / <code>ankle_pitch</code> / <code>ankle_roll</code>），躯干 1 个（<code>torso_joint</code>），双臂 10 个（每侧 <code>shoulder_pitch</code> / <code>shoulder_roll</code> / <code>shoulder_yaw</code> / <code>elbow_pitch</code> / <code>elbow_roll</code>），双手指 14 个（每侧 <code>zero</code> 至 <code>six</code> 七个手指关节）。训练使用 <code>G1_MINIMAL_CFG</code>，碰撞体比完整视觉模型更简化。</p>
+<p><strong>控制</strong>：控制量不是期望速度本身，而是与上述 37 个关节一一对应的关节位置偏移。图 3 所示的链条是：策略输出动作 <code>a</code> → 乘以 0.5 并加到默认关节姿态 <code>q₀</code> → 得到关节位置目标 <code>q*</code> → 由资产执行器在物理仿真中产生力矩 → 形成站立、摆腿与速度跟踪行为。中间没有手写步态控制器。</p>
+<figure>${g1ControlSVG()}<figcaption>图 3 · 控制量示意（G1 关节位置目标）。策略输出 37 维动作 <code>a</code>，经 <code>q* = q₀ + 0.5a</code> 转为 37 个关节位置目标；这些目标分别落到双腿、躯干、双臂和手指的受控关节，隐式 PD/电机再在物理仿真中产生关节力矩。</figcaption></figure>
+<p><strong>目标</strong>：最大化折扣累计奖励，使机器人在 20 秒训练回合内持续保持直立、减少躯干接触，并尽可能准确跟踪 <code>(vₓ, vᵧ, ωz)</code>。</p>
+<p>按 MDP 表述，问题定义见表 2。</p>
+<table class="kv-table">
+  <caption>表 2 · 问题的形式化定义</caption>
+  <tbody>
+    <tr><td class="k">环境</td><td>4096 个并行 Isaac Lab GPU 物理环境，平地 plane，控制频率 50 Hz</td></tr>
+    <tr><td class="k">智能体</td><td>RSL-RL PPO 的 Actor-Critic 策略</td></tr>
+    <tr><td class="k">状态 / 观测</td><td>123 维本体观测与速度命令，构成见表 3</td></tr>
+    <tr><td class="k">动作</td><td>37 维关节位置目标偏移，构成见第 3.2 节</td></tr>
+    <tr><td class="k">奖励</td><td>16 项加权和，主要由线速度/yaw 速度跟踪、双足步态与稳定性正则构成，见表 4</td></tr>
+    <tr><td class="k">回合</td><td>20 秒到时正常结束；躯干接触地面提前终止</td></tr>
+    <tr><td class="k">目标</td><td>最大化折扣累计回报，折扣因子 γ = 0.99</td></tr>
+  </tbody>
+</table>
+
+<h2 class="section-title"><span class="hnum">2</span>理论基础</h2>
+<p>本实验沿用 PPO 作为连续控制算法。第 1 节中的 G1 速度跟踪任务具有高维连续动作、长时序稳定性要求和大量并行仿真的特征，适合使用 on-policy Actor-Critic：Actor 产生连续动作分布，Critic 估计状态价值以降低策略梯度方差。</p>
+<p>PPO 的核心约束是裁剪新旧策略概率比，避免单次更新过大导致步态崩溃。优势估计使用 GAE(λ)，价值函数通过价值损失拟合回报，策略通过 surrogate loss 提升带正优势的动作概率。熵正则项控制动作分布的随机性：系数越高，训练越鼓励维持探索；系数越低，策略标准差通常收缩更快。本实验的唯一正式对照变量正是 <code>entropy_coef</code>。</p>
+<p>选择 PPO 的原因有三点：第一，动作是 37 维连续关节目标，策略梯度法比离散价值法更合适；第二，4096 个并行环境可提供充足 on-policy 样本；第三，G1 官方任务已给出 RSL-RL PPO 配置，本实验的目的不是重写任务，而是先建立官方配置下的可复现实证基线。</p>
+
+<h2 class="section-title"><span class="hnum">3</span>实验框架</h2>
+<h3 class="section-sub"><span class="hnum">3.1</span>网络结构</h3>
+<p>Actor 与 Critic 的网络结构如图 4 和图 5 所示。两者共享同样的 3 层隐藏层宽度（256、128、128），但输出不同：Actor 输出 37 维动作均值并带 37 个可学习 logσ，Critic 输出标量价值。实测 checkpoint 参数量为：Actor 85,962（含 37 个 logσ）、Critic 81,281，合计 167,243。</p>
+<figure>${RLNet.svg(g1MlpCfg("actor"))}<figcaption>图 4 · G1 Actor 网络架构。123 维观测经三层 MLP 映射为 37 维动作均值，配合独立可学习 logσ 构成对角高斯策略。</figcaption></figure>
+<figure>${RLNet.svg(g1MlpCfg("critic"))}<figcaption>图 5 · G1 Critic 网络架构。输入与 Actor 相同，输出为状态价值 V(s)，仅训练期使用。</figcaption></figure>
+
+<h3 class="section-sub"><span class="hnum">3.2</span>观测与动作</h3>
+<p>G1 flat 去除了 rough 任务中的 height scan，因此观测为 123 维。构成见表 3。</p>
+<table>
+  <caption>表 3 · 观测向量构成</caption>
+  <thead><tr><th>项</th><th>维度</th><th>含义</th><th>训练期噪声</th></tr></thead>
+  <tbody>
+    <tr><td><code>base_lin_vel</code></td><td>3</td><td>躯干线速度</td><td>Uniform [-0.1, 0.1]</td></tr>
+    <tr><td><code>base_ang_vel</code></td><td>3</td><td>躯干角速度</td><td>Uniform [-0.2, 0.2]</td></tr>
+    <tr><td><code>projected_gravity</code></td><td>3</td><td>重力方向在机体系中的投影，用于表征姿态</td><td>Uniform [-0.05, 0.05]</td></tr>
+    <tr><td><code>velocity_commands</code></td><td>3</td><td>目标 <code>vₓ</code>、<code>vᵧ</code>、<code>ωz</code></td><td>无</td></tr>
+    <tr><td><code>joint_pos</code></td><td>37</td><td>关节相对默认位置</td><td>Uniform [-0.01, 0.01]</td></tr>
+    <tr><td><code>joint_vel</code></td><td>37</td><td>关节相对速度</td><td>Uniform [-1.5, 1.5]</td></tr>
+    <tr><td><code>actions</code></td><td>37</td><td>上一步动作</td><td>无</td></tr>
+  </tbody>
+</table>
+<p>动作项为 <code>joint_pos</code>，维度 37。策略输出经 <code>scale=0.5</code> 缩放，并以默认关节位置为 offset，得到目标关节位置。Play 配置关闭观测 corruption 与随机外力，因此回放视频反映的是无感知噪声、无推搡的策略表现。</p>
+
+<h3 class="section-sub"><span class="hnum">3.3</span>奖励函数</h3>
+<p>奖励在每个控制步按权重与控制步长累加。G1 flat 的 16 个活跃奖励项见表 4：主目标是线速度与 yaw 速度跟踪，双足步态项鼓励单支撑和摆脚；其余项限制竖直速度、横滚/俯仰角速度、躯干倾斜、动作变化、脚滑、关节限位以及非必要关节偏离默认姿态。</p>
+<table>
+  <caption>表 4 · 奖励项与权重</caption>
+  <thead><tr><th>奖励项</th><th>权重</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td><code>track_lin_vel_xy_exp</code></td><td>+1.0</td><td>指数核跟踪 xy 线速度命令</td></tr>
+    <tr><td><code>track_ang_vel_z_exp</code></td><td>+1.0</td><td>指数核跟踪 yaw 角速度命令</td></tr>
+    <tr><td><code>feet_air_time</code></td><td>+0.75</td><td>双足任务中鼓励非零速度命令下的单支撑/摆脚时间</td></tr>
+    <tr><td><code>termination_penalty</code></td><td>−200.0</td><td>提前失败终止重罚</td></tr>
+    <tr><td><code>flat_orientation_l2</code></td><td>−1.0</td><td>惩罚躯干偏离水平姿态</td></tr>
+    <tr><td><code>dof_pos_limits</code></td><td>−1.0</td><td>惩罚踝关节接近位置限位</td></tr>
+    <tr><td><code>feet_slide</code></td><td>−0.1</td><td>惩罚触地脚滑动</td></tr>
+    <tr><td><code>joint_deviation_hip / arms / fingers / torso</code></td><td>−0.1 / −0.1 / −0.05 / −0.1</td><td>限制髋偏航/滚转、手臂、手指和躯干偏离默认姿态</td></tr>
+    <tr><td><code>lin_vel_z_l2</code></td><td>−0.2</td><td>限制竖直方向速度</td></tr>
+    <tr><td><code>ang_vel_xy_l2</code></td><td>−0.05</td><td>限制横滚/俯仰角速度</td></tr>
+    <tr><td><code>action_rate_l2</code></td><td>−0.005</td><td>惩罚连续动作变化过大</td></tr>
+    <tr><td><code>dof_torques_l2 / dof_acc_l2</code></td><td>−2e−6 / −1e−7</td><td>惩罚髋/膝力矩与加速度</td></tr>
+  </tbody>
+</table>
+
+<h3 class="section-sub"><span class="hnum">3.4</span>终止与复位</h3>
+<p>终止条件包含 <code>time_out</code> 与 <code>base_contact</code>。训练回合长度为 20 秒，即 1000 个控制步；<code>base_contact</code> 在 <code>torso_link</code> 接触力超过阈值时触发，表示机器人摔倒或躯干触地。复位时根位姿在 x/y/yaw 范围内随机化，关节以默认姿态复位，训练任务保留启动摩擦设置与 reset 事件；Play 任务关闭随机外力与观测噪声。</p>
+
+<h3 class="section-sub"><span class="hnum">3.5</span>训练流程</h3>
+<p>每次迭代中，PPO 先在 4096 个并行环境中收集每环境 24 个控制步，共 98,304 条 transition；随后以 4 个 mini-batch、5 个 learning epoch 更新 Actor-Critic。1500 次迭代对应约 1.47 亿控制步。</p>
+<div class="plist">
+  ${pr("num_envs", "4096", "官方配置；利用 GPU 并行物理提高采样吞吐。")}
+  ${pr("num_steps_per_env", "24", "G1 官方 RSL-RL 配置，单次 rollout 覆盖约 0.48 秒控制时间。")}
+  ${pr("max_iterations", "1500", "G1 flat 官方训练预算。")}
+  ${pr("save_interval", "50", "每 50 次迭代保存 checkpoint；最终模型为 model_1499.pt。")}
+</div>
+
+<h3 class="section-sub"><span class="hnum">3.6</span>环境与超参数</h3>
+<div class="plist">
+  ${kv("Isaac Lab", "isaaclab 0.54.3 · isaaclab_tasks 0.11.16 · Isaac Sim 5.1")}
+  ${kv("RSL-RL / PyTorch", "rsl-rl-lib 5.0.1 · torch 2.7.0+cu128")}
+  ${kv("GPU", "NVIDIA GeForce RTX 5070 Ti · driver 580.159.03")}
+  ${pr("learning_rate", "1e-3, adaptive", "官方 G1 PPO 配置；按 desired_kl=0.01 自适应调整。")}
+  ${pr("clip_param", "0.2", "PPO 标准裁剪半径。")}
+  ${pr("gamma / lam", "0.99 / 0.95", "折扣回报与 GAE 的通用设置。")}
+  ${pr("entropy_coef", "0.008 vs 0.005", "本实验唯一正式对照变量；0.008 为官方默认，0.005 为命令行覆盖。")}
+  ${pr("actor_hidden_dims", "[256, 128, 128]", "G1 flat 官方策略网络宽度。")}
+</div>
+<p><strong>复现命令。</strong></p>
+<pre>cd /home/jeff/IsaacLab
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Velocity-Flat-G1-v0 --headless --max_iterations 1500 --seed 42 --logger wandb --log_project_name robot-learning-dashboard --run_name g1-flat-baseline-s42
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Velocity-Flat-G1-v0 --headless --max_iterations 1500 --seed 42 --logger wandb --log_project_name robot-learning-dashboard --run_name g1-flat-entropy005-s42 agent.algorithm.entropy_coef=0.005</pre>
+
+<h2 class="section-title"><span class="hnum">4</span>实验结果</h2>
+<p>6 个正式 run 的记录与训练耗时见表 5。所有 run 均完成 1500 次迭代并写出最终 checkpoint。最佳候选策略的完整训练曲线如图 6 所示。</p>
+<table>
+  <caption>表 5 · 正式 run 清单</caption>
+  <thead><tr><th>条件</th><th>seed</th><th>公开标识</th><th>W&B</th><th>real time</th><th>末 100 回报</th></tr></thead>
+  <tbody>
+    <tr><td>baseline</td><td>42</td><td><code>baseline-s42</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/jhaw3zp5">jhaw3zp5</a></td><td>1418.51 s</td><td>28.15</td></tr>
+    <tr><td>baseline</td><td>43</td><td><code>baseline-s43</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/laa8wbet">laa8wbet</a></td><td>1301.64 s</td><td>28.09</td></tr>
+    <tr><td>baseline</td><td>44</td><td><code>baseline-s44</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/ewh31ipn">ewh31ipn</a></td><td>1301.69 s</td><td>27.88</td></tr>
+    <tr><td>entropy=0.005</td><td>42</td><td><code>entropy005-s42</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/pg5ing46">pg5ing46</a></td><td>1339.33 s</td><td>29.74</td></tr>
+    <tr><td>entropy=0.005</td><td>43</td><td><code>entropy005-s43</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/vc7x8lc8">vc7x8lc8</a></td><td>1349.75 s</td><td><strong>30.90</strong></td></tr>
+    <tr><td>entropy=0.005</td><td>44</td><td><code>entropy005-s44</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/x0z2w4xa">x0z2w4xa</a></td><td>1326.98 s</td><td>30.56</td></tr>
+  </tbody>
+</table>
+<figure class="chart-fig">
+<div data-rl-chart="locomotion/g1-flat"></div>
+<figcaption>图 6 · 最佳候选策略（entropy=0.005, seed=43）的全部训练曲线（30 条）。数据由本地 TensorBoard 事件文件导出，未作平滑或修饰。</figcaption>
+</figure>
+<p>图 6 显示，最佳候选策略在前约 250 次迭代内由负回报进入稳定站立与初步跟踪阶段，之后回报继续缓慢上升；末段 <code>Train/mean_episode_length</code> 接近 1000 步，说明大多数回合以 time_out 正常结束。</p>
+
+<h2 class="section-title"><span class="hnum">5</span>实验分析</h2>
+  <h3 class="section-sub"><span class="hnum">5.1</span>学习过程</h3>
+  <p>图 6 显示，最佳候选策略在前约 250 次迭代内由负回报进入稳定站立与初步跟踪阶段，随后回报继续缓慢上升。平均回合长度接近 1000 step 后，学习重点转向速度跟踪误差和动作稳定性的精修。这个形态说明，本实验的主要难点不是单次站立，而是高维关节在长时间速度命令下保持协调。</p>
+
+  <h3 class="section-sub"><span class="hnum">5.2</span>辅助指标</h3>
+  <p>图 6 中的辅助曲线表明，策略先学会维持回合长度，再逐步降低 x/y/yaw 速度误差。base_contact 终止比例在训练后段维持在 1% 以下，但没有完全消失；这与人形机器人在快速转向命令下偶发躯干触地一致。动作标准差从约 0.99 下降到 0.5 到 0.6 区间，表示 PPO 策略从高度探索逐步收敛到较稳定的关节命令分布。</p>
+
+  <h3 class="section-sub"><span class="hnum">5.3</span>种子一致性</h3>
+  <p>正式训练覆盖 2 个熵系数条件和 3 个随机种子。表 5 列出了 6 个 run 的公开标识、W&B 链接、训练耗时和末 100 迭代回报；所有 run 均完成 1500 次迭代并写出最终 checkpoint。默认熵条件的末段回报为 28.04±0.14，低熵条件为 30.40±0.60。该结果不是单一 checkpoint 的偶然现象，但低熵条件的 seed 间方差更大，因此后文只把它解释为当前预算下的稳定收益，而不是全局最优超参数。</p>
+
+  <h3 class="section-sub"><span class="hnum">5.4</span>策略行为</h3>
+  <p>视频 1 展示了训练后策略在随机速度命令下的 9.98 秒跟随镜头回放。Isaac Lab 默认固定相机在 locomotion 任务中很快会让机器人走出画面，因此本实验使用跟随镜头回放：相机原点绑定到机器人根部，并给定固定 eye/lookat 偏移，只影响可视化，不改变环境动力学或策略输入。</p>
+  <video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/g1-flat/frame-mid.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-flat/play-follow-10s.mp4"></video>
+  <figure>
+    <div class="frames">
+      <div><img src="assets/media/g1-flat/frame-early.jpg" width="1280" height="720" alt="第 1.78 秒：G1 起步行走"><span class="frame-t">t ≈ 1.78 s</span></div>
+      <div><img src="assets/media/g1-flat/frame-mid.jpg" width="1280" height="720" alt="第 4.98 秒：G1 持续行走"><span class="frame-t">t ≈ 4.98 s</span></div>
+      <div><img src="assets/media/g1-flat/frame-late.jpg" width="1280" height="720" alt="第 8.18 秒：G1 继续跟踪速度命令"><span class="frame-t">t ≈ 8.18 s</span></div>
+    </div>
+    <figcaption>图 7 · 10 秒跟随镜头回放抽帧。三个时刻均来自同一段真实回放视频，视频分辨率与抽帧分辨率均为 1280×720。</figcaption>
+  </figure>
+  <p>如图 7 所示，机器人能够维持直立、连续迈步，并随命令变化调整前进与转向；但步态仍然机械，转向时上肢与躯干补偿较明显。</p>
+  <p><strong>60 秒耐力测试。</strong>视频 2 把同一策略的评估回合长度临时扩展到 60 秒，仅用于耐力观察，不改变训练配置。训练回合设为 20 秒，是因为该窗口已足以暴露站立失败、速度跟踪和躯干接触终止，同时能保持较高采样吞吐；60 秒回放用于检查策略超过训练时长后的连续运行。</p>
+  <video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/g1-flat/frame-e35.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-flat/play-follow-endurance-60s.mp4"></video>
+  <figure>
+    <div class="frames">
+      <div><img src="assets/media/g1-flat/frame-e10.jpg" width="1280" height="720" alt="第 10 秒：G1 持续行走"><span class="frame-t">t ≈ 10 s</span></div>
+      <div><img src="assets/media/g1-flat/frame-e35.jpg" width="1280" height="720" alt="第 35 秒：G1 持续行走"><span class="frame-t">t ≈ 35 s</span></div>
+      <div><img src="assets/media/g1-flat/frame-e58.jpg" width="1280" height="720" alt="第 58 秒：G1 持续行走"><span class="frame-t">t ≈ 58 s</span></div>
+    </div>
+    <figcaption>图 8 · 60 秒耐力回放抽帧。三个时刻均来自同一段 60.0 秒真实回放视频，视频分辨率与抽帧分辨率均为 1280×720。</figcaption>
+  </figure>
+  <p>如图 8 所示，机器人没有出现立即摔倒或数秒内退化；长期运行主要稳定性来自较保守的步幅和持续姿态修正，而不是接近真实人类的自然步态。</p>
+
+  <h2 class="section-title"><span class="hnum">6</span>消融与对比实验</h2>
+  <p>本节补充正式消融实验。实验目标不是寻找全局最优超参数，而是验证在当前训练预算下，熵正则强度是否会显著影响接触型人形 locomotion 的最终策略。官方配置默认 <code>entropy_coef=0.008</code>；本报告只把该值降到 <code>0.005</code>，其余任务配置、训练迭代数、网络结构、并行环境数和随机种子集合均保持不变。设计见表 6。</p>
+  ${table(`<caption>表 6 · 熵系数消融设计。除 entropy_coef 外，其余配置保持一致。</caption>
+    <thead><tr><th>条件</th><th>entropy_coef</th><th>Seeds</th><th>每个 run 迭代数</th><th>并行环境</th><th>观测/动作/奖励</th></tr></thead>
+    <tbody>
+      <tr><td>默认熵</td><td>0.008</td><td>42, 43, 44</td><td>1500</td><td>4096</td><td>不变</td></tr>
+      <tr><td>低熵</td><td>0.005</td><td>42, 43, 44</td><td>1500</td><td>4096</td><td>不变</td></tr>
+    </tbody>`, "表 6 · 熵系数消融设计")}
+  <p>结果见表 7。低熵条件把末段平均回报从 28.04 提高到 30.40，约 +8.4%；主要收益来自 yaw 速度误差降低，从 0.464 降到 0.392，约 -15.5%。x/y 线速度误差变化较小，说明该调整并没有全面提升所有跟踪维度。动作标准差从 0.621 降到 0.480，表明策略探索幅度更小、输出更集中。</p>
+  ${table(`<caption>表 7 · 熵系数消融结果。数值为 3 seeds 的 mean±std，末段定义为最后 100 次迭代。</caption>
+    <thead><tr><th>指标</th><th>默认熵 0.008</th><th>低熵 0.005</th><th>相对变化</th></tr></thead>
+    <tbody>
+      <tr><td>Episode reward</td><td>28.04 ± 0.14</td><td>30.40 ± 0.60</td><td>+8.4%</td></tr>
+      <tr><td>Episode length</td><td>996.1 ± 0.6</td><td>996.5 ± 0.5</td><td>+0.0%</td></tr>
+      <tr><td>x 速度误差</td><td>0.120 ± 0.001</td><td>0.120 ± 0.003</td><td>+0.5%</td></tr>
+      <tr><td>y 速度误差</td><td>0.067 ± 0.006</td><td>0.060 ± 0.008</td><td>-10.5%</td></tr>
+      <tr><td>yaw 速度误差</td><td>0.464 ± 0.008</td><td>0.392 ± 0.031</td><td>-15.5%</td></tr>
+      <tr><td>base_contact 终止率</td><td>0.47% ± 0.18%</td><td>0.57% ± 0.14%</td><td>+21.2%</td></tr>
+      <tr><td>动作 std</td><td>0.621 ± 0.016</td><td>0.480 ± 0.005</td><td>-22.8%</td></tr>
+    </tbody>`, "表 7 · 熵系数消融结果")}
+  <figure class="chart-fig">
+    <div data-rl-compare="locomotion/g1-flat-ablation"></div>
+    <figcaption>图 9 · 熵系数消融的回报曲线（Train/mean_reward，6 个 run）。同条件同色，种子以线型区分；数据来自已导出的交互曲线文件。</figcaption>
+  </figure>
+  <p>如图 9 所示，低熵条件整体回报更高，但 seed 间差异也更明显。这个消融同时给出反向证据：低熵条件没有改善 base_contact 终止比例，反而从 0.47% 上升到 0.57%；低熵条件的回报标准差也更大。因此，本报告的结论不是“0.005 是最优熵系数”，而是“在当前 G1 flat 训练预算下，把 entropy_coef 从 0.008 降到 0.005 可以稳定提高回报与转向跟踪，但不解决所有稳定性问题”。</p>
+
+  <h2 class="section-title"><span class="hnum">7</span>局限性</h2>
+  <p>第一，本实验只覆盖仿真中的平地速度跟踪，没有加入外力扰动、地形高度场、传感噪声或 sim-to-real 随机化。第二，成功标准主要来自训练日志和视频回放；报告已经统计了速度误差、接触终止和动作标准差，但还没有独立评估脚本去批量测试固定命令、极端命令和长时间稳定性。第三，当前策略能走，但步态仍然机械，手臂和躯干补偿明显；这说明奖励函数更强调速度跟踪与不摔倒，而不是人类可解释的自然步态。第四，熵系数消融只比较了两个取值，还不能推出最优区间。</p>
+
+  <h2 class="section-title"><span class="hnum">8</span>结论与未来工作</h2>
+  <p>本实验完成了 Unitree G1 在 Isaac Lab 平地速度跟踪任务上的可复现实验：使用官方环境配置和 PPO 训练预算，G1 可以在 1500 次迭代内学到稳定平地行走策略。多种子结果显示，降低熵系数可以提高当前预算下的末段回报和 yaw 跟踪质量，但对躯干接触终止没有改善。后续最直接的工作是建立独立评估管线，把固定速度命令、随机命令、外部扰动和更长时间运行纳入统一测试；随后再进入粗糙地形、域随机化和更接近真实部署的鲁棒性实验。</p>
+
+  <h2 class="section-title appendix">附录 · 关于本报告</h2>
+<p><strong>数据来源。</strong>任务与 PPO 配置读取自 Isaac Lab 官方 G1 flat 配置；曲线与表格统计来自 6 个正式 run 的本地 TensorBoard 事件文件，统计口径为末 100 迭代种子间 mean ± std（ddof=1）；参数量读取自最终 checkpoint；视频与抽帧来自最佳候选策略的跟随镜头 Play 回放。</p>
+<p><strong>报告产物。</strong>完整训练曲线、对比曲线、回放视频与抽帧均随页面仓库提供；跟随镜头回放脚本为 <code>scripts/play_follow_camera.py</code>。</p>
+<p><strong>参考文献。</strong></p>
+<ol>
+  <li>J. Schulman, F. Wolski, P. Dhariwal, A. Radford, O. Klimov. <em>Proximal Policy Optimization Algorithms</em>. arXiv:1707.06347, 2017.</li>
+  <li>J. Schulman, P. Moritz, S. Levine, M. Jordan, P. Abbeel. <em>High-Dimensional Continuous Control Using Generalized Advantage Estimation</em>. arXiv:1506.02438, 2015.</li>
+  <li>N. Rudin, D. Hoeller, P. Reist, M. Hutter. <em>Learning to Walk in Minutes Using Massively Parallel Deep Reinforcement Learning</em>. CoRL 2021.</li>
+  <li>Isaac Lab Project Developers. <em>Isaac Lab</em>, official manager-based locomotion velocity tasks and Unitree G1 configuration.</li>
+</ol>
+`;
+

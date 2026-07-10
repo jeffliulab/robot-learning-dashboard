@@ -149,8 +149,12 @@
     Array.prototype.forEach.call(hs, function (hd, i) {
       if (!hd.id) hd.id = "sec-" + i;
       var isSub = hd.tagName === "H3";
+      var numEl = hd.querySelector(".hnum");
+      var num = numEl ? numEl.textContent.trim() : "";
       var label = hd.textContent.replace(/^\s*[\d.]+\s*/, "").trim();    // 去掉前导编号(含小数点)
-      var a = h("a", { href: "#" + hd.id, title: label, class: isSub ? "sub" : "" }, [label]);
+      var cls = (isSub ? "sub" : "") + (num ? " has-num" : "");
+      var kids = num ? [h("span", { class: "tn" }, [num]), h("span", { class: "tl" }, [label])] : [h("span", { class: "tl" }, [label])];
+      var a = h("a", { href: "#" + hd.id, title: label, class: cls.trim() }, kids);
       a.addEventListener("click", function (ev) {
         ev.preventDefault();               // 防止改写路由 hash
         /* 瞬时跳转而非 smooth：长报告一页可达 2 万 px，平滑滚动的动画途中

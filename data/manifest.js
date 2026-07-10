@@ -40,7 +40,7 @@ window.RL_TREE = {
               id: "cartpole-balance", title: "Cartpole 平衡实验", robot: "Cartpole", route: "RL",
               algo: "PPO", sim: "Isaac Lab",
               status: "done", date: "2026-07-06",
-              blurb: "本系列的第一份完整实验报告、也是 hello world：Isaac-Cartpole-v0 上以 PPO 训练平衡策略。"
+              blurb: "一份完整的入门级强化学习实验报告：Isaac-Cartpole-v0 上以 PPO 训练平衡策略。"
             },
             {
               id: "ant-walk", title: "Ant 四足行走实验", robot: "Ant", route: "RL",
@@ -50,8 +50,9 @@ window.RL_TREE = {
             },
             {
               id: "g1-flat", title: "G1 平地行走", robot: "G1", route: "RL",
-              status: "planned",
-              blurb: "人形正主：Isaac-Velocity-Flat-G1-v0，约 1500 迭代收敛，导出可部署策略。"
+              algo: "PPO", sim: "Isaac Lab",
+              status: "done", date: "2026-07-10",
+              blurb: "Isaac-Velocity-Flat-G1-v0 官方任务的 2 条件 × 3 种子训练记录：默认 entropy=0.008 与 entropy=0.005 对照，含跟随镜头回放和导出策略。"
             }
           ]
         },

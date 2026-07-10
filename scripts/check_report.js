@@ -10,16 +10,21 @@
  *        旧号在新结构下仍合法但语义指错，脚本抓不出来）
  *   4. 图 N 编号连续、各有 figcaption；除豁免名单外正文引用 ≥ 1 次
  *   5. 表 N（<caption>）编号连续；除豁免名单外正文引用 ≥ 1 次
+ *   6. img/video/source/poster 指向的本地媒体文件真实存在
+ *   7. 运行时执行 views.js，确保内容块能注册到 window.RL_CONTENT
+ *   8. 高维机器人报告必须有图 3 控制量示意，且标出控制量记号
  * ==========================================================================*/
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 
 const SRC = path.join(__dirname, "..", "content", "views.js");
 const full = fs.readFileSync(SRC, "utf8");
 /* 豁免"正文至少引用一次"的编号：页头元素（读者开篇即见，无需内联引用） */
 const REF_EXEMPT_FIG = [1];
 const REF_EXEMPT_TBL = [1];
+const ROOT = path.join(__dirname, "..");
 
 let fails = 0;
 const fail = (msg) => { fails++; console.error("  ✘ " + msg); };
@@ -31,6 +36,22 @@ const blockRe = /window\.RL_CONTENT\["([^"]+)"\]\s*=\s*`([\s\S]*?)`;/g;
 let bm;
 while ((bm = blockRe.exec(full)) !== null) blocks.push({ key: bm[1], text: bm[2] });
 if (!blocks.length) { console.error("未找到任何内容块"); process.exit(1); }
+
+console.log("===== 运行时加载检查 =====");
+try {
+  const ctx = { window: {}, console };
+  ctx.window.RL_CONTENT = {};
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "assets", "net-diagram.js"), "utf8"), ctx, { filename: "assets/net-diagram.js" });
+  ctx.RLNet = ctx.window.RLNet;
+  vm.runInContext(full, ctx, { filename: "content/views.js" });
+  const runtimeKeys = new Set(Object.keys(ctx.window.RL_CONTENT || {}));
+  const missing = blocks.map(b => b.key).filter(k => !runtimeKeys.has(k));
+  if (missing.length) fail(`运行时缺少内容块: ${missing.join(", ")}`);
+  else ok(`运行时注册 ${runtimeKeys.size} 个内容块`);
+} catch (e) {
+  fail(`views.js 运行时加载失败: ${e && e.message ? e.message : e}`);
+}
 
 for (const { key, text } of blocks) {
   console.log(`\n===== 内容块 ${key} =====`);
@@ -86,6 +107,25 @@ for (const { key, text } of blocks) {
     const re = new RegExp(`(见表 ${n}[^0-9]|表 ${n} 所示|表 ${n}：)`);
     if (!re.test(text)) fail(`表 ${n} 未在正文中被引用`);
   });
+
+  console.log("[6] 本地媒体文件");
+  const mediaRefs = [...text.matchAll(/(?:src|poster)="([^"]+)"/g)]
+    .map(m => m[1])
+    .filter(u => !/^https?:\/\//.test(u) && !/^data:/.test(u) && !u.startsWith("#"));
+  const uniqueMedia = [...new Set(mediaRefs)];
+  const missingMedia = uniqueMedia.filter(u => !fs.existsSync(path.join(ROOT, u)));
+  if (missingMedia.length) fail(`缺失媒体文件: ${missingMedia.join(", ")}`);
+  else ok(uniqueMedia.length ? `${uniqueMedia.length} 个本地媒体引用均存在` : "无本地媒体引用");
+
+  console.log("[7] 模板专项：控制量示意");
+  if (["locomotion/ant-walk", "locomotion/g1-flat"].includes(key)) {
+    if (!/<figcaption>图 3 · [^<]*控制量示意/.test(text)) fail("高维机器人报告缺少图 3 · 控制量示意");
+    else if (key === "locomotion/ant-walk" && !/τ/.test(text)) fail("Ant 控制量示意缺少力矩记号 τ");
+    else if (key === "locomotion/g1-flat" && !/(q\*|qᵢ\*)/.test(text)) fail("G1 控制量示意缺少关节位置目标记号 q* / qᵢ*");
+    else ok("控制量示意满足模板专项检查");
+  } else {
+    ok("低维控制图可并入被控对象示意图");
+  }
 }
 
 console.log(fails ? `\n共 ${fails} 处问题` : "\n全部通过");
