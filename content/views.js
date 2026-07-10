@@ -20,7 +20,9 @@ function heroLoopSVG(cfg) {
     '<path class="ar" d="M330 88 H488" marker-end="url(#' + mid + ')"/>' +
     '<text class="sb" x="410" y="74" text-anchor="middle">动作 a ∈ ℝ' + cfg.aDim + "</text>" +
     '<path class="ar" d="M490 122 H332" marker-end="url(#' + mid + ')"/>' +
-    '<text class="sb" x="410" y="146" text-anchor="middle">观测 s′ ∈ ℝ' + cfg.sDim + "　　奖励 r ∈ ℝ</text>" +
+    /* 回传标签拆两行居中放进两框之间的空档（框距 330–490 只有 160px，一行放不下） */
+    '<text class="sb" x="410" y="146" text-anchor="middle">观测 s′ ∈ ℝ' + cfg.sDim + "</text>" +
+    '<text class="sb" x="410" y="168" text-anchor="middle">奖励 r ∈ ℝ</text>' +
     '</svg>';
 }
 /* ---------- SVG：Cartpole 物理系统示意（图 2）---------- */
@@ -112,7 +114,7 @@ function antSVG() {
   s += '<text class="lb" x="585" y="104" text-anchor="middle">目标方向 +x</text>';
   s += '<text class="sb" x="585" y="140" text-anchor="middle">目标点 (1000, 0, 0)，即持续向前行走</text>';
   /* 失败判据注记 */
-  s += '<text class="sb" x="80" y="222" text-anchor="start">俯视示意 · 失败判据（侧视量）：躯干高度 &lt; 0.31 m 即摔倒终止</text>';
+  s += '<text class="sb" x="80" y="230" text-anchor="start">俯视示意 · 失败判据（侧视量）：躯干高度 &lt; 0.31 m 即摔倒终止</text>';   /* 下移避开左右后腿足端(≈210) */
   return '<svg viewBox="0 0 820 236" role="img" aria-label="Ant 物理系统示意（俯视）">' +
     '<defs><marker id="mkAnt" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' +
     s + "</svg>";
@@ -145,7 +147,7 @@ function antLegControlSVG() {
   s += '<text class="sb" x="655" y="130" text-anchor="middle">策略每个控制步输出 8 个数，缩放后直接作为力矩</text>';
   s += '<text class="sb" x="655" y="154" text-anchor="middle">执行器无内置刚度 / 阻尼，不经 PD 环</text>';
   /* 视角注记 */
-  s += '<text class="sb" x="60" y="34" text-anchor="start">侧视示意 · 只画 1 条腿；其余 3 条腿同构，各有同样的 2 个力矩关节</text>';
+  s += '<text class="sb" x="60" y="24" text-anchor="start">侧视示意 · 只画 1 条腿；其余 3 条腿同构，各有同样的 2 个力矩关节</text>';   /* 上移避开躯干圆顶(y≈34) */
   return '<svg viewBox="0 0 820 244" role="img" aria-label="Ant 控制量示意（侧视，放大 1 条腿）">' +
     '<defs><marker id="mkTau" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' +
     s + "</svg>";
@@ -761,61 +763,64 @@ function g1HumanoidSVG() {
   s += '<path class="eg" d="M325 102 L415 86"/><text class="sb" x="424" y="90" text-anchor="start">torso_link：躯干接触即失败终止</text>';
   s += '<path class="ar" d="M430 155 H690" marker-end="url(#mkG1Sys)"/><text class="lb" x="560" y="136" text-anchor="middle">速度命令 c = (vₓ, vᵧ, ωz)</text>';
   s += '<text class="sb" x="560" y="178" text-anchor="middle">训练范围：vₓ∈[0,1] m/s，vᵧ∈[-0.5,0.5] m/s，ωz∈[-1,1] rad/s</text>';
-  s += '<text class="sb" x="115" y="52" text-anchor="start">Unitree G1 · 37 个受控关节 · 50 Hz 关节位置目标</text>';
+  s += '<text class="sb" x="80" y="26" text-anchor="start">Unitree G1 · 37 个受控关节 · 50 Hz 关节位置目标</text>';   /* 顶部留白带，避开头部圆(305,58,r20) */
   return '<svg viewBox="0 0 820 256" role="img" aria-label="G1 平地速度跟踪任务示意"><defs><marker id="mkG1Sys" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' + s + '</svg>';
 }
 function g1ControlSVG() {
   var s = "";
-  s += '<text class="sb" x="36" y="28" text-anchor="start">侧视示意 · 控制量落到 G1 的 37 个受控关节</text>';
+  s += '<text class="sb" x="36" y="28" text-anchor="start">正视示意 · 圆点 = 受控关节组（如髋部 3 个自由度并作一点），逐侧数量见图内标注</text>';
   /* left: policy action to joint-position targets */
   s += '<rect class="nd" x="42" y="62" rx="7" width="138" height="72"/>';
   s += '<text class="lb" x="111" y="92" text-anchor="middle">Actor π</text><text class="sb" x="111" y="116" text-anchor="middle">a ∈ ℝ³⁷</text>';
   s += '<path class="ar" d="M184 98 H275" marker-end="url(#mkG1Ctl)"/><text class="sb" x="230" y="82" text-anchor="middle">逐关节动作</text>';
   s += '<rect class="nd io" x="282" y="62" rx="7" width="168" height="72"/>';
   s += '<text class="lb" x="366" y="90" text-anchor="middle">关节位置目标</text><text class="sb" x="366" y="114" text-anchor="middle">q* = q₀ + 0.5a</text>';
-  s += '<path class="ar" d="M454 98 H535" marker-end="url(#mkG1Ctl)"/><text class="sb" x="494" y="82" text-anchor="middle">qᵢ* 落到关节</text>';
+  s += '<path class="ar" d="M454 98 H590" marker-end="url(#mkG1Ctl)"/><text class="sb" x="497" y="82" text-anchor="middle">qᵢ* 落到各关节</text>';
 
-  /* humanoid skeleton */
-  s += '<circle class="nd io" cx="620" cy="56" r="18"/>';
-  s += '<path class="ar" style="stroke-width:7;stroke-linecap:round" d="M620 76 L620 146"/>';
-  s += '<path class="ar" style="stroke-width:5;stroke-linecap:round" d="M620 96 L570 128 M620 96 L670 128"/>';
-  s += '<path class="ar" style="stroke-width:5;stroke-linecap:round" d="M620 146 L584 214 L568 288 M620 146 L656 214 L672 288"/>';
-  s += '<path class="ar" style="stroke-width:4;stroke-linecap:round" d="M570 128 L548 178 M670 128 L692 178"/>';
-  s += '<path class="ar" style="stroke-width:3;stroke-linecap:round" d="M548 178 L534 200 M548 178 L548 204 M548 178 L562 200 M692 178 L678 200 M692 178 L692 204 M692 178 L706 200"/>';
+  /* humanoid skeleton（正视，比例与图 2 一致：臂在上、腿在下；腕/手爪与膝保持水平间隔，避免混读） */
+  s += '<circle class="nd io" cx="620" cy="50" r="17"/>';
+  s += '<path class="ar" style="stroke-width:7;stroke-linecap:round" d="M620 67 L620 150"/>';                       // 躯干
+  s += '<path class="ar" style="stroke-width:5;stroke-linecap:round" d="M620 92 L572 145 L548 205 M620 92 L668 145 L692 205"/>';  // 双臂：肩→肘→腕
+  s += '<path class="ar" style="stroke-width:3;stroke-linecap:round" d="M548 205 L536 225 M548 205 L548 227 M548 205 L560 225 M692 205 L680 225 M692 205 L692 227 M692 205 L704 225"/>'; // 手指
+  s += '<path class="ar" style="stroke-width:5;stroke-linecap:round" d="M620 150 L590 222 L590 300 M620 150 L650 222 L650 300"/>'; // 双腿：髋→膝→踝
 
-  /* controlled joint markers */
+  /* 受控关节组圆点（13 个组位；每点可含多个自由度，逐侧数量见 eg 标注） */
   var pts = [
-    [620,96,'torso_joint'],
-    [584,214,'left knee / ankle chain'], [568,288,'left ankle'], [656,214,'right knee / ankle chain'], [672,288,'right ankle'],
-    [584,146,'left hip'], [656,146,'right hip'],
-    [570,128,'left shoulder'], [548,178,'left elbow'], [670,128,'right shoulder'], [692,178,'right elbow'],
-    [534,200,'left fingers'], [548,204,'left fingers'], [562,200,'left fingers'], [678,200,'right fingers'], [692,204,'right fingers'], [706,200,'right fingers']
+    [620, 120, 'torso_joint ×1'],
+    [606, 108, 'left shoulder ×3'], [634, 108, 'right shoulder ×3'],
+    [572, 145, 'left elbow ×2'], [668, 145, 'right elbow ×2'],
+    [548, 205, 'left fingers ×7 = 拇指3 + 食指2 + 中指2（三指手）'], [692, 205, 'right fingers ×7 = 拇指3 + 食指2 + 中指2（三指手）'],
+    [605, 186, 'left hip ×3'], [635, 186, 'right hip ×3'],
+    [590, 222, 'left knee ×1'], [650, 222, 'right knee ×1'],
+    [590, 300, 'left ankle ×2'], [650, 300, 'right ankle ×2']
   ];
   pts.forEach(function (p) { s += '<circle class="ctl" cx="' + p[0] + '" cy="' + p[1] + '" r="5"><title>' + p[2] + '</title></circle>'; });
 
-  /* target-position arrows to joint groups */
-  s += '<path class="tar" d="M540 118 C566 105 590 100 615 98" marker-end="url(#mkQ)"/>';
-  s += '<path class="tar" d="M540 138 C555 166 570 188 584 212" marker-end="url(#mkQ)"/>';
-  s += '<path class="tar" d="M540 158 C575 166 620 162 656 146" marker-end="url(#mkQ)"/>';
-  s += '<path class="tar" d="M540 178 C570 180 655 182 692 178" marker-end="url(#mkQ)"/>';
-  s += '<text class="lb" x="764" y="94" text-anchor="middle">控制量</text>';
-  s += '<text class="sb" x="764" y="120" text-anchor="middle">37 个 qᵢ* 位置目标</text>';
-  s += '<text class="sb" x="764" y="144" text-anchor="middle">腿 12 · 躯干 1 · 臂 10 · 手指 14</text>';
-  s += '<text class="sb" x="764" y="176" text-anchor="middle">隐式 PD/电机根据 qᵢ*</text>';
-  s += '<text class="sb" x="764" y="198" text-anchor="middle">在物理仿真中产生 τᵢ</text>';
+  /* 分组标注（引线指到代表关节；逐侧数量加总 = 6×2+5×2+7×2+1 = 37） */
+  s += '<path class="eg" d="M630 122 L698 84"/><text class="sb" x="704" y="86" text-anchor="start">躯干 ×1</text>';
+  s += '<path class="eg" d="M572 145 L512 153"/><text class="sb" x="506" y="157" text-anchor="end">臂 ×5/侧</text>';
+  s += '<path class="eg" d="M536 225 L500 243"/><text class="sb" x="494" y="247" text-anchor="end">手指 ×7/侧</text>';
+  s += '<path class="eg" d="M590 262 L522 278"/><text class="sb" x="516" y="282" text-anchor="end">腿 ×6/侧</text>';
 
-  /* curved arcs: generated torques, not direct policy outputs */
-  s += '<path class="tau" d="M574 133 C556 120 558 102 574 94" marker-end="url(#mkTauG1)"/><text class="sb" x="548" y="96" text-anchor="end">τᵢ</text>';
-  s += '<path class="tau" d="M648 133 C666 120 664 102 648 94" marker-end="url(#mkTauG1)"/><text class="sb" x="690" y="96" text-anchor="start">τᵢ</text>';
-  s += '<path class="tau" d="M584 232 C566 224 563 207 578 197" marker-end="url(#mkTauG1)"/>';
-  s += '<path class="tau" d="M656 232 C674 224 677 207 662 197" marker-end="url(#mkTauG1)"/>';
+  /* 右侧文字列：最长行约 190px 宽，中心放 845 → 跨约 750–940，
+   * 与骨架最右点留足间隙，画布 980 的右边距约 40px */
+  s += '<text class="lb" x="845" y="94" text-anchor="middle">控制量</text>';
+  s += '<text class="sb" x="845" y="120" text-anchor="middle">37 个 qᵢ* 位置目标</text>';
+  s += '<text class="sb" x="845" y="144" text-anchor="middle">腿 12 · 躯干 1 · 臂 10 · 手指 14</text>';
+  s += '<text class="sb" x="845" y="176" text-anchor="middle">隐式 PD/电机根据 qᵢ*</text>';
+  s += '<text class="sb" x="845" y="198" text-anchor="middle">在物理仿真中产生 τᵢ</text>';
 
-  s += '<text class="sb" x="410" y="332" text-anchor="middle">策略只给关节位置目标；没有手写步态控制器。站立、摆腿、接触节律与速度跟踪由 PPO 策略和物理闭环共同形成。</text>';
-  return '<svg viewBox="0 0 860 350" role="img" aria-label="G1 控制量示意：37 维关节位置目标落到受控关节">' +
+  /* 力矩 = 绕关节的弧形箭头 ⟳（模板红线画法，示例取双肘——远离手/膝拥挤区） */
+  s += '<path class="ar" style="stroke-width:1.4" d="M594 145 A 22 22 0 1 1 572 123" fill="none" marker-end="url(#mkTauG1)"/>';
+  s += '<text class="sb" x="546" y="116" text-anchor="end">τᵢ</text>';
+  s += '<path class="ar" style="stroke-width:1.4" d="M690 145 A 22 22 0 1 1 668 123" fill="none" marker-end="url(#mkTauG1)"/>';
+  s += '<text class="sb" x="696" y="116" text-anchor="start">τᵢ</text>';
+
+  s += '<text class="sb" x="490" y="332" text-anchor="middle">策略只给关节位置目标；没有手写步态控制器。站立、摆腿、接触节律与速度跟踪由 PPO 策略和物理闭环共同形成。</text>';
+  return '<svg viewBox="0 0 980 350" role="img" aria-label="G1 控制量示意：37 维关节位置目标落到受控关节">' +
     '<defs><marker id="mkG1Ctl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker>' +
-    '<marker id="mkQ" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path style="fill:var(--accent)" d="M0 0L10 5L0 10z"/></marker>' +
-    '<marker id="mkTauG1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path style="fill:var(--ink-3)" d="M0 0L10 5L0 10z"/></marker></defs>' +
-    '<style>.ctl{fill:var(--accent);stroke:var(--paper);stroke-width:2}.tar{stroke:var(--accent);stroke-width:1.8;fill:none}.tau{stroke:var(--ink-3);stroke-width:1.4;fill:none;stroke-dasharray:3 3}</style>' + s + '</svg>';
+    '<marker id="mkTauG1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' +
+    '<style>.ctl{fill:var(--accent);stroke:var(--paper);stroke-width:2}</style>' + s + '</svg>';
 }
 window.RL_CONTENT["locomotion/g1-flat"] = `
 <h1 class="page-h1">G1 平地行走</h1>
@@ -844,7 +849,7 @@ window.RL_CONTENT["locomotion/g1-flat"] = `
 <h2 class="section-title"><span class="hnum">1</span>背景与问题定义</h2>
 <p>本任务要求 G1 在平地上跟踪随机采样的底盘速度命令。系统与任务目标如图 2 所示：机器人需要在不让躯干接触地面的前提下，跟踪前进、侧向与 yaw 角速度命令。</p>
 <figure>${g1HumanoidSVG()}<figcaption>图 2 · G1 平地速度跟踪任务示意。命令由 <code>base_velocity</code> 生成，平地任务去除了高度扫描与地形 curriculum；躯干 <code>torso_link</code> 发生非法接触时回合失败终止。</figcaption></figure>
-<p><strong>机器人</strong>：Unitree G1 minimal 资产，共 37 个受控关节。关节构成为：双腿 12 个（每侧 <code>hip_yaw</code> / <code>hip_roll</code> / <code>hip_pitch</code> / <code>knee</code> / <code>ankle_pitch</code> / <code>ankle_roll</code>），躯干 1 个（<code>torso_joint</code>），双臂 10 个（每侧 <code>shoulder_pitch</code> / <code>shoulder_roll</code> / <code>shoulder_yaw</code> / <code>elbow_pitch</code> / <code>elbow_roll</code>），双手指 14 个（每侧 <code>zero</code> 至 <code>six</code> 七个手指关节）。训练使用 <code>G1_MINIMAL_CFG</code>，碰撞体比完整视觉模型更简化。</p>
+<p><strong>机器人</strong>：Unitree G1 minimal 资产，共 37 个受控关节。关节构成为：双腿 12 个（每侧 <code>hip_yaw</code> / <code>hip_roll</code> / <code>hip_pitch</code> / <code>knee</code> / <code>ankle_pitch</code> / <code>ankle_roll</code>），躯干 1 个（<code>torso_joint</code>），双臂 10 个（每侧 <code>shoulder_pitch</code> / <code>shoulder_roll</code> / <code>shoulder_yaw</code> / <code>elbow_pitch</code> / <code>elbow_roll</code>），双手指 14 个——G1 的手是<strong>三指</strong>灵巧手，每侧 7 个关节 = 拇指 3 + 食指 2 + 中指 2（官方资产中的关节名是无语义的 <code>zero</code> 至 <code>six</code>）。训练使用 <code>G1_MINIMAL_CFG</code>，碰撞体比完整视觉模型更简化。</p>
 <p><strong>控制</strong>：控制量不是期望速度本身，而是与上述 37 个关节一一对应的关节位置偏移。图 3 所示的链条是：策略输出动作 <code>a</code> → 乘以 0.5 并加到默认关节姿态 <code>q₀</code> → 得到关节位置目标 <code>q*</code> → 由资产执行器在物理仿真中产生力矩 → 形成站立、摆腿与速度跟踪行为。中间没有手写步态控制器。</p>
 <figure>${g1ControlSVG()}<figcaption>图 3 · 控制量示意（G1 关节位置目标）。策略输出 37 维动作 <code>a</code>，经 <code>q* = q₀ + 0.5a</code> 转为 37 个关节位置目标；这些目标分别落到双腿、躯干、双臂和手指的受控关节，隐式 PD/电机再在物理仿真中产生关节力矩。</figcaption></figure>
 <p><strong>目标</strong>：最大化折扣累计奖励，使机器人在 20 秒训练回合内持续保持直立、减少躯干接触，并尽可能准确跟踪 <code>(vₓ, vᵧ, ωz)</code>。</p>
