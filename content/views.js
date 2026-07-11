@@ -1024,21 +1024,83 @@ window.RL_CONTENT["locomotion/g1-flat"] = `
   </figure>
   <p>如图 9 所示，低熵条件整体回报更高，但 seed 间差异也更明显。这个消融同时给出反向证据：低熵条件没有改善 base_contact 终止比例，反而从 0.47% 上升到 0.57%；低熵条件的回报标准差也更大。因此，本报告的结论不是“0.005 是最优熵系数”，而是“在当前 G1 flat 训练预算下，把 entropy_coef 从 0.008 降到 0.005 可以稳定提高回报与转向跟踪，但不解决所有稳定性问题”。</p>
 
-  <h2 class="section-title"><span class="hnum">7</span>局限性</h2>
-  <p>第一，本实验只覆盖仿真中的平地速度跟踪，没有加入外力扰动、地形高度场、传感噪声或 sim-to-real 随机化。第二，成功标准主要来自训练日志和视频回放；报告已经统计了速度误差、接触终止和动作标准差，但还没有独立评估脚本去批量测试固定命令、极端命令和长时间稳定性。第三，当前策略能走，但步态仍然机械，手臂和躯干补偿明显；这说明奖励函数更强调速度跟踪与不摔倒，而不是人类可解释的自然步态。第四，熵系数消融只比较了两个取值，还不能推出最优区间。</p>
+  <h2 class="section-title"><span class="hnum">7</span>独立评估</h2>
+  <p>第 6 节的消融结论来自训练期日志，回答的是"学习过程好不好"；本节用独立评估管线在训练之外正面回答"训出来的策略到底多可靠"。评估协议借鉴 AGILE 工作流的分层思路（确定性场景做可复现回归基准、随机命令 rollout 测鲁棒性），由四类场景组成，见表 8。全部评估在去随机化的 Play 环境变体中进行（观测噪声与随机推搡关闭），推理为确定性（取动作分布均值、不采样）；6 个策略在每个场景前重设同一评估种子，保证考的是同一套题。每回合 50 个并行环境同时开考，逐回合明细与聚合结果落盘为 CSV 与 JSON，并记录 checkpoint 与场景配置的哈希以便溯源。</p>
+  <table>
+    <caption>表 8 · 独立评估协议。四类场景合计每策略 1,300 回合、约 3.8 万仿真秒。</caption>
+    <thead><tr><th>场景</th><th>命令</th><th>回合 × 时长</th><th>检验什么</th></tr></thead>
+    <tbody>
+      <tr><td>随机命令</td><td>训练分布随机抽取，每回合恒定</td><td>500 × 20 s</td><td>命令分布下的总体水平</td></tr>
+      <tr><td>固定网格</td><td>10 个确定性考点，覆盖训练范围（前进 0–1.0 m/s、横移 ±0.5 m/s、转向 ±1.0 rad/s 及其组合）</td><td>每考点 50 × 20 s</td><td>可复现回归基准，之后每个版本考同一套题</td></tr>
+      <tr><td>耐力</td><td>恒定 0.5 m/s 前进</td><td>50 × 60 s</td><td>超过训练回合 3 倍时长的连续运行</td></tr>
+      <tr><td>命令切换</td><td>训练分布随机抽取，每 10 s 重采样</td><td>250 × 60 s</td><td>命令切换瞬间的鲁棒性</td></tr>
+    </tbody>
+  </table>
+  <p>指标口径如下。速度跟踪误差与训练日志的 <code>error_vel_xy</code>/<code>error_vel_yaw</code> 同源：基座系下水平速度误差的 L2 范数、偏航角速度误差的绝对值，对有效步取时间平均；同一误差另按均方根（RMSE）口径并行计算并落盘，表 9 以同源均值口径为主、附随机命令场景的线速度 RMSE。每回合剔除起步 1 秒的稳定期与终止边界步，摔倒后自动重置产生的数据全部不计。可靠性主指标是<strong>摔倒回合数与成功率</strong>（摔倒 = 躯干触地终止，即训练中的 base_contact，本任务唯一的非超时终止）；MTBF（平均摔倒间隔 = 总行走秒数 ÷ 摔倒次数）作为衍生指标一并报告——该指标引自可靠性工程、并非 locomotion 学界的标准基准指标，零摔倒时只报删失下界、不做外推。能耗以无量纲运输成本 COT = Σ|τ·q̇|Δt ÷ (mgd) 衡量（绝对值口径的机械功代理，按 50 Hz 控制频率采样，绝对值偏低，仅用于同协议下横向比较）。跟踪与能耗统计只计入未摔倒回合。</p>
+  <p>核心结果见表 9：两个条件呈现清晰的取舍。<strong>跟踪精度上低熵条件更好</strong>——随机命令场景的线速度误差 0.072 对 0.088 m/s，与第 6 节训练日志"低熵跟踪更好"的总方向一致，构成训练指标与独立评估的交叉验证；不过收益的通道分布并不相同（训练日志中集中在 yaw，评估中集中在线速度），这与两处环境条件不同有关——训练环境带观测噪声与随机推搡，评估环境全部关闭。<strong>可靠性上默认熵条件全面占优</strong>：三个种子在全部四类场景、合计 31.7 小时仿真行走中零摔倒（MTBF ≥ 114,000 s）；低熵条件共摔倒 62 次（MTBF 1,819 s），且全部集中在 seed 42 一个策略——它在范围角点考点（前进 1.0 + 横移 0.5 + 转向 1.0 同时下达）50 回合全部摔倒（平均约 3.2 秒），在命令切换场景也摔了 12 次。耐人寻味的是，这个最脆的种子恰好是固定网格上跟踪最准的策略（线速度误差 0.066，全体最低）——跟踪越"贴"命令、留给稳定裕度的空间越小。</p>
+  <table>
+    <caption>表 9 · 独立评估核心结果。数值为 3 个训练种子的 mean±std（ddof=1）；跟踪误差与 COT 只统计未摔倒回合；线速度误差单位 m/s、偏航误差单位 rad/s。</caption>
+    <thead><tr><th>场景</th><th>指标</th><th>默认熵 0.008</th><th>低熵 0.005</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="5">随机命令</td><td>成功率</td><td>1.000 ± 0.000</td><td>1.000 ± 0.000</td></tr>
+      <tr><td>线速度误差</td><td>0.088 ± 0.011</td><td><strong>0.072 ± 0.013</strong></td></tr>
+      <tr><td>线速度 RMSE</td><td>0.091 ± 0.010</td><td>0.076 ± 0.013</td></tr>
+      <tr><td>偏航误差</td><td>0.059 ± 0.004</td><td>0.057 ± 0.003</td></tr>
+      <tr><td>COT</td><td>1.084 ± 0.051</td><td>1.196 ± 0.013</td></tr>
+      <tr><td rowspan="3">固定网格（10 考点合并）</td><td>成功率</td><td><strong>1.000 ± 0.000</strong></td><td>0.967 ± 0.058</td></tr>
+      <tr><td>摔倒数（/1,500 回合）</td><td>0</td><td>50（全部来自 seed 42 的角点考点）</td></tr>
+      <tr><td>线速度误差</td><td>0.105 ± 0.011</td><td>0.087 ± 0.019</td></tr>
+      <tr><td rowspan="2">耐力 60 s</td><td>成功率</td><td>1.000 ± 0.000</td><td>1.000 ± 0.000</td></tr>
+      <tr><td>线速度误差</td><td>0.092 ± 0.011</td><td>0.073 ± 0.018</td></tr>
+      <tr><td rowspan="2">命令切换 60 s</td><td>成功率</td><td><strong>1.000 ± 0.000</strong></td><td>0.984 ± 0.028</td></tr>
+      <tr><td>摔倒数（/750 回合）</td><td>0</td><td>12（全部来自 seed 42）</td></tr>
+      <tr><td rowspan="2">全场景合计</td><td>摔倒数</td><td><strong>0</strong></td><td>62</td></tr>
+      <tr><td>MTBF</td><td>≥ 114,000 s（零摔倒，删失下界）</td><td>1,819 s</td></tr>
+    </tbody>
+  </table>
+  <p>逐考点看，范围角点是两个条件共同的最难考题：默认熵条件虽然不摔，线速度误差也升到 0.298 ± 0.033 m/s，是其余考点（≤ 0.12 m/s）的两倍以上——三个命令同时压到训练范围上限时，策略以牺牲跟踪精度换取不摔。运动质量指标（关节加速度 RMS 约 105 rad/s²、动作变化率）在两条件间无显著差异。</p>
+  <p>视频 3 展示了最佳候选策略（低熵 seed 43）在固定网格五个代表性考点上的连续表现：0.5 与 1.0 m/s 直行、0.5 m/s 横移、1.0 rad/s 转向、范围角点，每段 8 秒。</p>
+  <video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/g1-flat/frame-g-walk100.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-flat/eval-grid-medley.mp4"></video>
+  <figure>
+    <div class="frames">
+      <div><img src="assets/media/g1-flat/frame-g-walk100.jpg" width="1280" height="720" alt="1.0 米每秒直行"><span class="frame-t">1.0 m/s 直行</span></div>
+      <div><img src="assets/media/g1-flat/frame-g-strafe.jpg" width="1280" height="720" alt="0.5 米每秒横移"><span class="frame-t">0.5 m/s 横移</span></div>
+      <div><img src="assets/media/g1-flat/frame-g-turn.jpg" width="1280" height="720" alt="1.0 弧度每秒转向"><span class="frame-t">1.0 rad/s 转向</span></div>
+      <div><img src="assets/media/g1-flat/frame-g-corner.jpg" width="1280" height="720" alt="范围角点复合命令"><span class="frame-t">范围角点</span></div>
+    </div>
+    <figcaption>图 10 · 固定网格集锦（视频 3）抽帧：四个考点下的行走姿态，头顶箭头为环境自带的命令/实际速度可视化标记。视频与抽帧分辨率均为实测 1280×720。</figcaption>
+  </figure>
+  <p>如图 10 所示，该策略在四个考点均保持直立行走，转向与横移时躯干和手臂有明显补偿动作。视频 4 是命令切换场景的完整 60 秒回放（每 10 秒重采样一次命令）：该策略在多次命令切换间保持行走，未出现摔倒。</p>
+  <video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/g1-flat/frame-sw-30.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-flat/eval-switching-60s.mp4"></video>
+  <p>视频 5 记录了评估发现的失效模式实况：低熵 seed 42 在范围角点命令下的回合。如图 11 的抽帧序列所示，机器人起步后约 2.6 秒身体前倾失稳，约 3 秒时躯干触地、回合终止（画面中机器人随后回到出生点，是评估环境的自动重置）。</p>
+  <video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/g1-flat/frame-fall-1.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-flat/eval-corner-fall.mp4"></video>
+  <figure>
+    <div class="frames">
+      <div><img src="assets/media/g1-flat/frame-fall-1.jpg" width="1280" height="720" alt="第 1 秒：正常行走"><span class="frame-t">t ≈ 1.0 s</span></div>
+      <div><img src="assets/media/g1-flat/frame-fall-26.jpg" width="1280" height="720" alt="第 2.6 秒：身体前倾失稳"><span class="frame-t">t ≈ 2.6 s</span></div>
+      <div><img src="assets/media/g1-flat/frame-fall-3.jpg" width="1280" height="720" alt="第 3 秒：躯干触地"><span class="frame-t">t ≈ 3.0 s</span></div>
+    </div>
+    <figcaption>图 11 · 角点命令下的摔倒过程（视频 5）抽帧：正常行走 → 前倾失稳 → 躯干触地终止。视频与抽帧分辨率均为实测 1280×720。</figcaption>
+  </figure>
+  <p>独立评估把第 6 节的结论补全了：训练日志里"低熵回报更高"的优势，在评估中只兑现在跟踪精度维度；可靠性维度上默认熵条件严格占优，且训练日志中 base_contact 终止率的微小差异（0.47% 对 0.57%）在评估中放大为 0 摔对 62 摔的差距。单一种子在极限命令下成灾也再次说明：多种子评估不是仪式，是发现这类失效模式的唯一途径。</p>
 
-  <h2 class="section-title"><span class="hnum">8</span>结论与未来工作</h2>
-  <p>本实验完成了 Unitree G1 在 Isaac Lab 平地速度跟踪任务上的可复现实验：使用官方环境配置和 PPO 训练预算，G1 可以在 1500 次迭代内学到稳定平地行走策略。多种子结果显示，降低熵系数可以提高当前预算下的末段回报和 yaw 跟踪质量，但对躯干接触终止没有改善。后续最直接的工作是建立独立评估管线，把固定速度命令、随机命令、外部扰动和更长时间运行纳入统一测试；随后再进入粗糙地形、域随机化和更接近真实部署的鲁棒性实验。</p>
+  <h2 class="section-title"><span class="hnum">8</span>局限性</h2>
+  <p>第一，本实验只覆盖仿真中的平地速度跟踪，没有加入外力扰动、地形高度场、传感噪声或 sim-to-real 随机化；独立评估同样未包含扰动场景（列入后续抗扰动专项）。第二，独立评估使用单一评估种子（为保证 6 个策略同卷可比而固定），单种子带来的初始状态分布偏差靠每场景 250–500 回合的样本量摊薄，但未做多评估种子的稳定性检验；COT 为 50 Hz 机械功近似，绝对值不可与文献对标。第三，评估还暴露了一个训练目标未覆盖的行为：零速站立命令下策略存在约 0.05 m/s 的缓慢移动（20 秒累计路径约 1 米；该值为路径长度而非净位移），两个条件都有。第四，当前策略能走，但步态仍然机械，手臂和躯干补偿明显；这说明奖励函数更强调速度跟踪与不摔倒，而不是人类可解释的自然步态。第五，熵系数消融只比较了两个取值，还不能推出最优区间。</p>
+
+  <h2 class="section-title"><span class="hnum">9</span>结论与未来工作</h2>
+  <p>本实验完成了 Unitree G1 在 Isaac Lab 平地速度跟踪任务上的可复现实验：使用官方环境配置和 PPO 训练预算，G1 可以在 1500 次迭代内学到稳定平地行走策略。多种子结果显示，降低熵系数可以提高当前预算下的末段回报和 yaw 跟踪质量；独立评估（第 7 节）进一步表明这一收益只兑现在跟踪精度上——默认熵条件在 31.7 小时评估行走中零摔倒，而低熵条件的一个种子在极限命令下系统性摔倒。评估管线已沉淀为可复用的标准工具（固定命令网格、随机命令、耐力与命令切换四类场景），后续的奖励项消融将以它为统一准绳；随后进入粗糙地形、域随机化和抗扰动专项。</p>
 
   <h2 class="section-title appendix">附录 · 关于本报告</h2>
-<p><strong>数据来源。</strong>任务与 PPO 配置读取自 Isaac Lab 官方 G1 flat 配置；曲线与表格统计来自 6 个正式 run 的本地 TensorBoard 事件文件，统计口径为末 100 迭代种子间 mean ± std（ddof=1）；参数量读取自最终 checkpoint；视频与抽帧来自最佳候选策略的跟随镜头 Play 回放。</p>
-<p><strong>报告产物。</strong>完整训练曲线、对比曲线、回放视频与抽帧均随页面仓库提供；跟随镜头回放脚本为 <code>scripts/play_follow_camera.py</code>。</p>
+<p><strong>数据来源。</strong>任务与 PPO 配置读取自 Isaac Lab 官方 G1 flat 配置；曲线与表格统计来自 6 个正式 run 的本地 TensorBoard 事件文件，统计口径为末 100 迭代种子间 mean ± std（ddof=1）；参数量读取自最终 checkpoint；视频与抽帧来自最佳候选策略的跟随镜头 Play 回放。第 7 节的评估数字来自代码仓评估管线的落盘产物（每回合明细 CSV 共 7,800 回合，聚合 JSON 记录 checkpoint 与场景配置的 SHA-256 哈希、Isaac Lab 版本与代码 git 提交号），成功率经"CSV 原始逐行计数"与"聚合脚本"两条独立路径对账一致。</p>
+<p><strong>报告产物。</strong>完整训练曲线、对比曲线、回放视频与抽帧均随页面仓库提供；跟随镜头回放脚本为 <code>scripts/play_follow_camera.py</code>，评估管线为代码仓 <code>eval/</code> 目录（场景声明式 YAML + 采集/聚合两段式脚本），评估媒体的实测尺寸记录于 <code>media-info-eval.json</code>。</p>
 <p><strong>参考文献。</strong></p>
 <ol>
   <li>J. Schulman, F. Wolski, P. Dhariwal, A. Radford, O. Klimov. <em>Proximal Policy Optimization Algorithms</em>. arXiv:1707.06347, 2017.</li>
   <li>J. Schulman, P. Moritz, S. Levine, M. Jordan, P. Abbeel. <em>High-Dimensional Continuous Control Using Generalized Advantage Estimation</em>. arXiv:1506.02438, 2015.</li>
   <li>N. Rudin, D. Hoeller, P. Reist, M. Hutter. <em>Learning to Walk in Minutes Using Massively Parallel Deep Reinforcement Learning</em>. CoRL 2021.</li>
   <li>Isaac Lab Project Developers. <em>Isaac Lab</em>, official manager-based locomotion velocity tasks and Unitree G1 configuration.</li>
+  <li><em>AGILE: A Comprehensive Workflow for Humanoid Loco-Manipulation Learning</em>. arXiv:2603.20147, 2026.（独立评估协议的分层思路来源）</li>
+  <li>Z. Fu, A. Kumar, J. Malik, D. Pathak. <em>Minimizing Energy Consumption Leads to the Emergence of Gaits in Legged Robots</em>. CoRL 2021, arXiv:2111.01674.（COT 机械功代理口径）</li>
 </ol>
 `;
 

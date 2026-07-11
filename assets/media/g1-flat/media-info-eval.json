@@ -1,0 +1,73 @@
+{
+  "videos": {
+    "eval-grid-medley.mp4": {
+      "width": 1280,
+      "height": 720,
+      "fps": 50.0,
+      "duration_s": 39.9
+    },
+    "eval-switching-60s.mp4": {
+      "width": 1280,
+      "height": 720,
+      "fps": 50.0,
+      "duration_s": 60.0
+    },
+    "eval-corner-fall.mp4": {
+      "width": 1280,
+      "height": 720,
+      "fps": 50.0,
+      "duration_s": 7.98
+    }
+  },
+  "images": {
+    "frame-g-walk100.jpg": {
+      "source": "eval-grid-medley.mp4",
+      "t_s": 12.0,
+      "width": 1280,
+      "height": 720
+    },
+    "frame-g-strafe.jpg": {
+      "source": "eval-grid-medley.mp4",
+      "t_s": 20.0,
+      "width": 1280,
+      "height": 720
+    },
+    "frame-g-turn.jpg": {
+      "source": "eval-grid-medley.mp4",
+      "t_s": 28.0,
+      "width": 1280,
+      "height": 720
+    },
+    "frame-g-corner.jpg": {
+      "source": "eval-grid-medley.mp4",
+      "t_s": 36.0,
+      "width": 1280,
+      "height": 720
+    },
+    "frame-sw-30.jpg": {
+      "source": "eval-switching-60s.mp4",
+      "t_s": 30.0,
+      "width": 1280,
+      "height": 720
+    },
+    "frame-fall-1.jpg": {
+      "source": "eval-corner-fall.mp4",
+      "t_s": 1.0,
+      "width": 1280,
+      "height": 720
+    },
+    "frame-fall-3.jpg": {
+      "source": "eval-corner-fall.mp4",
+      "t_s": 3.0,
+      "width": 1280,
+      "height": 720
+    },
+    "frame-fall-26.jpg": {
+      "source": "eval-corner-fall.mp4",
+      "t_s": 2.6,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "note": "v0.4 独立评估媒体；follow camera 同 media-info.json"
+}
