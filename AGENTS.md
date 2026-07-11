@@ -16,6 +16,10 @@
 
 新增报告时保持正文 key、manifest ID、数据路径与媒体路径一致，完成后运行 `node scripts/check_report.js` 并人工核对引用语义。
 
+## 本地预览（2026-07-11 定）
+
+实验报告的本地测试**一律走主站开发服务器**：在父仓 `PRIVATE_jeffliulab` 工作区跑 `npm run dev`（端口 **4321 是 jeffliulab.com 本地服务器的专属端口**），访问 `http://localhost:4321/robot-learning-dashboard` 验收主站内嵌效果（静态资源经 `public/experiments-app` 符号链接直达本仓工作副本，改文件即生效）。⛔ **不要用本仓单独起 http 服务来做测试**（`file://` 直开 index.html 只可作快速自查，验收以主站内嵌为准）。
+
 ## Git 边界
 
 本仓单独提交，只 stage 本次实验文件；父仓随后提交 gitlink。`main` 同时影响主站与 GitHub Pages，未经用户授权不要 push。
