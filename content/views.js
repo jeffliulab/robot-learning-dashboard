@@ -1025,15 +1025,15 @@ window.RL_CONTENT["locomotion/g1-flat"] = `
   <p>如图 9 所示，低熵条件整体回报更高，但 seed 间差异也更明显。这个消融同时给出反向证据：低熵条件没有改善 base_contact 终止比例，反而从 0.47% 上升到 0.57%；低熵条件的回报标准差也更大。因此，本报告的结论不是“0.005 是最优熵系数”，而是“在当前 G1 flat 训练预算下，把 entropy_coef 从 0.008 降到 0.005 可以稳定提高回报与转向跟踪，但不解决所有稳定性问题”。</p>
 
   <h2 class="section-title"><span class="hnum">7</span>独立评估</h2>
-  <p>第 6 节的消融结论来自训练期日志，反映的是学习过程的质量；本节用独立评估管线在训练之外考察训练所得策略的可靠性。评估协议借鉴 AGILE 工作流的分层设计——确定性场景提供低方差、可复现的回归基准，随机命令 rollout 检验命令分布下的鲁棒性——由四类场景组成，见表 8。全部评估在去随机化的 Play 环境变体中进行（观测噪声与随机推搡关闭）；推理为确定性，即取动作分布的均值而不采样；六个策略在每个场景开始前重设同一评估种子，从而在相同的初始状态与命令序列下比较。每轮 50 个并行环境同时执行，逐回合明细与聚合结果落盘为 CSV 与 JSON，并记录 checkpoint 与场景配置的哈希以便溯源。</p>
+  <p>第 6 节的消融结论来自训练期日志，反映的是学习过程的质量；本节用独立评估管线在训练之外考察训练所得策略的可靠性。评估协议借鉴 AGILE 工作流的分层设计——确定性场景提供低方差、可复现的回归基准，随机命令 rollout 检验命令分布下的鲁棒性——由四类场景组成，见表 8；其中固定网格的 10 个命令点覆盖训练命令范围 vₓ∈[0, 1.0] m/s、vᵧ∈[−0.5, 0.5] m/s、ωz∈[−1.0, 1.0] rad/s 及其组合。全部评估在去随机化的 Play 环境变体中进行（观测噪声与随机推搡关闭）；推理为确定性，即取动作分布的均值而不采样；六个策略在每个场景开始前重设同一评估种子，从而在相同的初始状态与命令序列下比较。每轮 50 个并行环境同时执行，逐回合明细与聚合结果落盘为 CSV 与 JSON，并记录 checkpoint 与场景配置的哈希以便溯源。</p>
   <table>
     <caption>表 8 · 独立评估协议。四类场景合计每策略 1,300 回合、约 3.8 万仿真秒。</caption>
-    <thead><tr><th>场景</th><th>命令</th><th>回合 × 时长</th><th>检验目标</th></tr></thead>
+    <thead><tr><th>场景</th><th>命令</th><th style="white-space:nowrap">回合 × 时长</th><th>检验目标</th></tr></thead>
     <tbody>
-      <tr><td style="white-space:nowrap">随机命令</td><td>训练分布随机抽取，每回合恒定</td><td>500 × 20 s</td><td>命令分布下的总体水平</td></tr>
-      <tr><td style="white-space:nowrap">固定网格</td><td>10 个确定性命令点，覆盖训练范围（前进 0–1.0 m/s、横移 ±0.5 m/s、转向 ±1.0 rad/s 及其组合）</td><td>每点 50 × 20 s</td><td>可复现的回归基准，供后续版本在相同条件下对比</td></tr>
-      <tr><td style="white-space:nowrap">耐力</td><td>恒定 0.5 m/s 前进</td><td>50 × 60 s</td><td>超过训练回合 3 倍时长的连续运行</td></tr>
-      <tr><td style="white-space:nowrap">命令切换</td><td>训练分布随机抽取，每 10 s 重采样</td><td>250 × 60 s</td><td>命令切换瞬间的鲁棒性</td></tr>
+      <tr><td style="white-space:nowrap">随机命令</td><td>训练分布随机抽取，每回合恒定</td><td style="white-space:nowrap">500 × 20 s</td><td>命令分布下的总体水平</td></tr>
+      <tr><td style="white-space:nowrap">固定网格</td><td>10 个确定性命令点，覆盖训练范围及其组合</td><td style="white-space:nowrap">每点 50 × 20 s</td><td>可复现的回归基准，供后续版本在相同条件下对比</td></tr>
+      <tr><td style="white-space:nowrap">耐力</td><td>恒定 0.5 m/s 前进</td><td style="white-space:nowrap">50 × 60 s</td><td>超过训练回合 3 倍时长的连续运行</td></tr>
+      <tr><td style="white-space:nowrap">命令切换</td><td>训练分布随机抽取，每 10 s 重采样</td><td style="white-space:nowrap">250 × 60 s</td><td>命令切换瞬间的鲁棒性</td></tr>
     </tbody>
   </table>
   <p>指标口径如下。速度跟踪误差与训练日志的 <code>error_vel_xy</code>/<code>error_vel_yaw</code> 同源：基座系下水平速度误差的 L2 范数、偏航角速度误差的绝对值，对有效步取时间平均；同一误差另按均方根（RMSE）口径并行计算并落盘，表 9 以同源均值口径为主、附随机命令场景的线速度 RMSE。每回合剔除起步 1 秒的稳定期与终止边界步，摔倒后自动重置产生的数据全部不计。可靠性主指标是<strong>摔倒回合数与成功率</strong>（摔倒 = 躯干触地终止，即训练中的 base_contact，本任务唯一的非超时终止）；MTBF（平均摔倒间隔 = 总行走秒数 ÷ 摔倒次数）作为衍生指标一并报告——该指标引自可靠性工程、并非 locomotion 学界的标准基准指标，零摔倒时只报删失下界、不做外推。能耗以无量纲运输成本 COT = Σ|τ·q̇|Δt ÷ (mgd) 衡量（绝对值口径的机械功代理，按 50 Hz 控制频率采样，绝对值偏低，仅用于同协议下横向比较）。跟踪与能耗统计只计入未摔倒回合。</p>
