@@ -824,6 +824,39 @@ function g1ControlSVG() {
     '<marker id="mkTauG1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' +
     '<style>.ctl{fill:var(--accent);stroke:var(--paper);stroke-width:2}</style>' + s + '</svg>';
 }
+/* ---------- SVG：速度阶梯——三条件命令范围与展示点（G1 速度阶梯报告图 4）---------- */
+function g1SpeedLadderSVG() {
+  var x0 = 150, x45 = 770, scale = (x45 - x0) / 4.5;
+  function X(v){ return x0 + v * scale; }
+  var s = "";
+  s += '<text class="sb" x="40" y="26" text-anchor="start">三个训练条件只有一处不同：前进速度命令范围 lin_vel_x（其余奖励、观测、网络与超参数全部相同）</text>';
+  var axisY = 250;
+  s += '<path class="vb" d="M'+x0+' '+axisY+' H'+(x45+16)+'"/>';
+  s += '<path class="ar" d="M'+(x45+16)+' '+axisY+' l-2 0" marker-end="url(#mkLad)"/>';
+  for (var v=0; v<=4; v++){
+    s += '<path class="eg" d="M'+X(v)+' '+(axisY-5)+' V'+(axisY+5)+'"/>';
+    s += '<text class="sb" x="'+X(v)+'" y="'+(axisY+22)+'" text-anchor="middle">'+v+'</text>';
+  }
+  s += '<text class="sb" x="'+(x45+22)+'" y="'+(axisY+22)+'" text-anchor="start">m/s</text>';
+  var rows = [
+    { y:70,  cls:'lad1', hi:1.0, pt:1.0, name:'官方基线（复用实验）', range:'范围 0–1.0', tag:'展示 1.0 m/s · 步行' },
+    { y:120, cls:'lad2', hi:2.2, pt:2.0, name:'run2 条件',           range:'范围 0–2.2', tag:'展示 2.0 m/s · 快步' },
+    { y:170, cls:'lad3', hi:4.5, pt:4.0, name:'sprint4 条件',        range:'范围 0–4.5', tag:'展示 4.0 m/s · 奔跑' }
+  ];
+  rows.forEach(function(r){
+    s += '<text class="lb" x="'+x0+'" y="'+(r.y-8)+'" text-anchor="start">'+r.name+'　'+r.range+'</text>';
+    s += '<rect class="'+r.cls+'" x="'+x0+'" y="'+r.y+'" width="'+(X(r.hi)-x0)+'" height="20" rx="3"/>';
+    s += '<path class="eg" stroke-dasharray="3 3" d="M'+X(r.hi)+' '+(r.y+20)+' V'+axisY+'"/>';
+    s += '<circle class="ladpt" cx="'+X(r.pt)+'" cy="'+(r.y+10)+'" r="6"/>';
+    s += '<path class="eg" stroke-dasharray="3 3" d="M'+X(r.pt)+' '+(r.y+10)+' V'+axisY+'"/>';
+    s += '<text class="sb" x="'+(X(r.hi)+14)+'" y="'+(r.y+15)+'" text-anchor="start">'+r.tag+'</text>';
+  });
+  s += '<text class="sb" x="40" y="292" text-anchor="start">橙点 = 各条件的展示速度；条长 = 该条件训练时前进速度命令的采样范围。</text>';
+  return '<svg viewBox="0 0 960 306" role="img" aria-label="三个条件的速度命令范围与展示点">' +
+    '<defs><marker id="mkLad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>' +
+    '<style>.lad1{fill:var(--ink-3)}.lad2{fill:var(--ink-2)}.lad3{fill:var(--ink)}.ladpt{fill:var(--accent);stroke:var(--paper);stroke-width:2}</style>' +
+    s + '</svg>';
+}
 window.RL_CONTENT["locomotion/g1-flat"] = `
 <h1 class="page-h1">G1 平地行走</h1>
 <p class="dek abstract"><strong>摘要：</strong>本实验研究 Unitree G1 人形机器人在 Isaac Lab 官方 <code>Isaac-Velocity-Flat-G1-v0</code> 任务中的平地速度跟踪。方法上保持官方任务源码不变，以 RSL-RL PPO 训练 2 个条件 × 3 个随机种子：官方默认 <code>entropy_coef=0.008</code> 与命令行覆盖 <code>entropy_coef=0.005</code>。6 个正式 run 均训练 1500 次迭代、每 run 约 1.47 亿步仿真。结果显示，在本训练预算下，较低熵系数的末 100 迭代平均回报为 <strong>30.40 ± 0.60</strong>，高于默认组的 <strong>28.04 ± 0.14</strong>；yaw 速度误差由 <strong>0.464</strong> 降至 <strong>0.392</strong>，但躯干接触终止占比未同步下降。最佳候选策略来自 <code>entropy=0.005</code>、seed 43，已导出 <code>policy.pt</code> 与 <code>policy.onnx</code>，并录制约 10 秒与 60 秒跟随镜头回放。</p>
@@ -1107,3 +1140,253 @@ window.RL_CONTENT["locomotion/g1-flat"] = `
 </ol>
 `;
 
+
+window.RL_CONTENT["locomotion/g1-speed"] = `
+<h1 class="page-h1">G1 速度阶梯：从步行到奔跑</h1>
+<p class="dek abstract"><strong>摘要：</strong>本实验研究 Unitree G1 人形机器人的前进速度能力如何由训练命令分布决定。方法上继承 Isaac Lab 官方 <code>Isaac-Velocity-Flat-G1-v0</code> 任务，仅通过自定义配置子类覆盖前进速度命令范围 <code>lin_vel_x</code> 一项，奖励函数、观测、动作、网络结构与全部超参数保持官方原值不变，得到三个条件：官方范围 0–1.0 m/s（基线）、扩展范围 0–2.2 m/s（run2）与 0–4.5 m/s（sprint4）。每个扩展条件以 RSL-RL PPO 训练 3 个随机种子、每 run 1500 次迭代。独立评估（9 个策略、450 回合）显示：官方范围策略在 2.0 m/s 命令下三个种子中有两个整轮全部摔倒；把范围扩到 0–2.2 后，同一 2.0 m/s 命令下三个种子全部零摔、线速度 RMSE 0.040 ± 0.002 m/s；扩到 0–4.5 的策略在 4.0 m/s 命令下三个种子全部零摔、RMSE 0.080 ± 0.009 m/s，且腾空占比达 20.2%——在未修改任何奖励项的前提下自发形成了带腾空相的奔跑步态。核心结论是：官方为步行设计的奖励表本身足以支撑到奔跑速度，策略的速度能力边界主要由训练时见过的命令范围决定，而非奖励函数。</p>
+<div class="meta" data-exp-tags></div>
+
+<table class="kv-table">
+  <caption>表 1 · 实验概要</caption>
+  <tbody>
+    <tr><td class="k">状态</td><td><strong>已训练 ✓</strong>　6 个正式 run（run2 / sprint4 各 3 种子）+ 复用基线 3 种子</td></tr>
+    <tr><td class="k">机器人</td><td>Unitree G1 minimal（37 个受控关节；隐式 PD 关节位置执行器）</td></tr>
+    <tr><td class="k">技术路线</td><td>强化学习 · PPO · RSL-RL</td></tr>
+    <tr><td class="k">任务环境</td><td><code>Isaac-Velocity-Flat-G1-v0</code>（Isaac Lab 官方 Manager-based 任务）</td></tr>
+    <tr><td class="k">任务配置</td><td><strong>自定义 cfg 子类</strong>：继承官方 <code>G1FlatEnvCfg</code>，仅覆盖 <code>commands.base_velocity.ranges.lin_vel_x</code>（run2 = (0, 2.2)、sprint4 = (0, 4.5)）；奖励、观测、动作、网络、超参数一律沿用官方值</td></tr>
+    <tr><td class="k">并行环境数</td><td>4096</td></tr>
+    <tr><td class="k">迭代 / 步数</td><td>1500 次迭代；每迭代 4096×24 步；单 run 约 147,456,000 步</td></tr>
+    <tr><td class="k">训练设备</td><td>NVIDIA GeForce RTX 5070 Ti（16 GB）</td></tr>
+    <tr><td class="k">真实训练耗时</td><td>6 个正式 run 合计约 7928 秒（2.20 小时）；单 run 约 21.5–22.8 分钟</td></tr>
+    <tr><td class="k">观测 / 动作维度</td><td>123 维 → 37 维（三条件相同）</td></tr>
+    <tr><td class="k">策略网络</td><td>Actor 123→256→128→128→37；Critic 123→256→128→128→1；合计 167,243 个参数（与基线同构）</td></tr>
+    <tr><td class="k">关键结果</td><td>sprint4 在 4.0 m/s 下三种子零摔、RMSE 0.080，腾空占比 20.2%（自发奔跑）；官方范围基线在 2.0 m/s 下三种子中两个整轮全部摔倒</td></tr>
+  </tbody>
+</table>
+
+<figure>${heroLoopSVG({ policy: "PPO Actor-Critic · 123→…→37", env: "Isaac-Velocity-Flat-G1-v0", aDim: "³⁷", sDim: "¹²³" })}<figcaption>图 1 · G1 速度跟踪任务的智能体–环境交互回路。策略接收本体观测与速度命令，输出 37 维关节位置动作；环境返回下一步观测、奖励与终止信号。本实验的唯一改动位于命令一侧——扩大前进速度命令的采样范围。</figcaption></figure>
+
+<h2 class="section-title"><span class="hnum">1</span>背景与问题定义</h2>
+<p>Isaac Lab 官方 G1 平地任务要求机器人跟踪随机采样的底盘速度命令，其前进速度命令范围默认为 <code>vₓ ∈ [0, 1.0] m/s</code>。这一范围既定义了训练时机器人会遇到的速度，也隐含地划定了它"练过"的能力区间。本实验提出的问题是：<strong>如果只把这一个命令范围改大、其余全部不动，机器人能否学会更快的移动，速度的上限又在哪里？</strong>任务与被控系统如图 2 所示。</p>
+<figure>${g1HumanoidSVG()}<figcaption>图 2 · G1 平地速度跟踪任务示意。命令由 <code>base_velocity</code> 生成；躯干 <code>torso_link</code> 发生非法接触时回合失败终止。图中标注的 <code>vₓ∈[0,1]</code> 为官方默认范围，正是本实验作为研究变量加以扩展的对象。</figcaption></figure>
+<p><strong>机器人</strong>：Unitree G1 minimal 资产，共 37 个受控关节。关节构成为：双腿 12 个（每侧 <code>hip_yaw</code> / <code>hip_roll</code> / <code>hip_pitch</code> / <code>knee</code> / <code>ankle_pitch</code> / <code>ankle_roll</code>），躯干 1 个（<code>torso_joint</code>），双臂 10 个（每侧 <code>shoulder_pitch</code> / <code>shoulder_roll</code> / <code>shoulder_yaw</code> / <code>elbow_pitch</code> / <code>elbow_roll</code>），双手指 14 个（G1 为三指灵巧手，每侧 7 个关节 = 拇指 3 + 食指 2 + 中指 2）。三个条件使用完全相同的 <code>G1_MINIMAL_CFG</code> 资产。</p>
+<p><strong>控制</strong>：控制量是与 37 个关节一一对应的关节位置偏移，而非期望速度本身。图 3 所示的链条是：策略输出动作 <code>a</code> → <code>q* = q₀ + 0.5a</code> 得到关节位置目标 → 隐式 PD/电机在物理仿真中产生力矩 → 形成站立、摆腿与速度跟踪。中间没有手写步态控制器；不同前进速度下的步态（步行、快步、奔跑）都是由同一套奖励与物理闭环学出，而不是为每档速度手工设计的。</p>
+<figure>${g1ControlSVG()}<figcaption>图 3 · 控制量示意（G1 关节位置目标）。策略输出 37 维动作 <code>a</code>，经 <code>q* = q₀ + 0.5a</code> 转为 37 个关节位置目标，分别落到双腿、躯干、双臂和手指的受控关节；隐式 PD/电机据此在物理仿真中产生关节力矩。</figcaption></figure>
+<p><strong>目标</strong>：最大化折扣累计奖励，使机器人在 20 秒回合内保持直立、不使躯干触地，并尽可能准确跟踪 <code>(vₓ, vᵧ, ωz)</code> 命令——其中 <code>vₓ</code> 的取值范围正是三个条件的唯一区别。三个条件的命令范围与各自的展示速度见图 4。</p>
+<figure>${g1SpeedLadderSVG()}<figcaption>图 4 · 三个训练条件的前进速度命令范围与展示速度。三者只有 <code>lin_vel_x</code> 采样范围不同：基线 0–1.0（官方）、run2 0–2.2、sprint4 0–4.5 m/s；其余奖励、观测、动作、网络与超参数完全一致。两个扩展条件的展示速度取各自范围上限的约 90%（2.0/2.2、4.0/4.5），基线展示速度即其范围上限 1.0 m/s。</figcaption></figure>
+<p>按 MDP 表述，问题定义见表 2。</p>
+<table class="kv-table">
+  <caption>表 2 · 问题的形式化定义</caption>
+  <tbody>
+    <tr><td class="k">环境</td><td>4096 个并行 Isaac Lab GPU 物理环境，平地 plane，控制频率 50 Hz</td></tr>
+    <tr><td class="k">智能体</td><td>RSL-RL PPO 的 Actor-Critic 策略</td></tr>
+    <tr><td class="k">状态 / 观测</td><td>123 维本体观测与速度命令，构成见表 3</td></tr>
+    <tr><td class="k">动作</td><td>37 维关节位置目标偏移</td></tr>
+    <tr><td class="k">奖励</td><td>16 项加权和（官方 G1 flat 原表，三条件相同），见表 4</td></tr>
+    <tr><td class="k">回合</td><td>20 秒到时正常结束；躯干接触地面提前终止</td></tr>
+    <tr><td class="k">目标</td><td>最大化折扣累计回报，折扣因子 γ = 0.99</td></tr>
+  </tbody>
+</table>
+
+<h2 class="section-title"><span class="hnum">2</span>理论基础</h2>
+<p>本实验沿用 PPO 作为连续控制算法。G1 速度跟踪任务具有高维连续动作、长时序稳定性要求和大量并行仿真的特征，适合 on-policy Actor-Critic：Actor 产生连续动作分布，Critic 估计状态价值以降低策略梯度方差。PPO 的核心约束是裁剪新旧策略概率比，避免单次更新过大导致步态崩溃；优势估计使用 GAE(λ)，价值函数通过价值损失拟合回报，策略通过 surrogate loss 提升带正优势的动作概率。熵正则项控制动作分布的随机性。本实验三个条件的算法、网络与全部超参数完全相同，唯一的自变量是环境侧的命令采样范围。</p>
+<p><strong>命令范围与能力边界。</strong>在速度跟踪任务中，机器人每回合被下达一个从 <code>lin_vel_x</code> 范围内均匀采样的前进速度目标，并因跟踪该目标而获得奖励。因此训练分布决定了策略在训练中见过哪些速度：范围上限之外的速度在训练中从未出现，策略既没有为其优化过跟踪精度，也没有为其学过维持平衡所需的姿态与步频。把范围从 0–1.0 扩大到 0–2.2 或 0–4.5，等价于要求同一套奖励与网络在更宽的速度谱上都保持直立与跟踪——这既检验官方奖励表能支撑的速度上限，也检验"扩大命令范围"这一最小改动能否把能力边界整体外推。选择 PPO 的原因与基线条件一致：37 维连续动作适合策略梯度法、4096 并行环境提供充足样本、官方已给出可复现的 RSL-RL PPO 配置。</p>
+
+<h2 class="section-title"><span class="hnum">3</span>实验框架</h2>
+<h3 class="section-sub"><span class="hnum">3.1</span>网络结构</h3>
+<p>三个条件共用同一网络结构，如图 5、图 6 所示。Actor 与 Critic 共享 3 层隐藏层宽度（256、128、128），Actor 输出 37 维动作均值并带 37 个可学习 logσ，Critic 输出标量价值。实测 checkpoint 参数量：Actor 85,962（含 37 个 logσ）、Critic 81,281，合计 167,243——与官方基线完全一致，因为本实验没有改动网络。</p>
+<figure>${RLNet.svg(g1MlpCfg("actor"))}<figcaption>图 5 · Actor 网络架构。123 维观测经三层 MLP 映射为 37 维动作均值，配合独立可学习 logσ 构成对角高斯策略。</figcaption></figure>
+<figure>${RLNet.svg(g1MlpCfg("critic"))}<figcaption>图 6 · Critic 网络架构。输入与 Actor 相同，输出为状态价值 V(s)，仅训练期使用。</figcaption></figure>
+
+<h3 class="section-sub"><span class="hnum">3.2</span>观测与动作</h3>
+<p>观测为 123 维，构成见表 3。值得指出的是，观测里包含 <code>velocity_commands</code>（3 维，即当前回合下达的 <code>vₓ, vᵧ, ωz</code>）——策略据此知道"这一回合要跑多快"，从而在同一网络内对不同速度命令作出不同响应。这也是"扩大命令范围即可扩大能力"之所以成立的结构基础：速度目标是观测的一部分，网络本就具备按命令调整行为的输入通道。</p>
+<table>
+  <caption>表 3 · 观测向量构成</caption>
+  <thead><tr><th>项</th><th>维度</th><th>含义</th><th>训练期噪声</th></tr></thead>
+  <tbody>
+    <tr><td><code>base_lin_vel</code></td><td>3</td><td>躯干线速度</td><td>Uniform [-0.1, 0.1]</td></tr>
+    <tr><td><code>base_ang_vel</code></td><td>3</td><td>躯干角速度</td><td>Uniform [-0.2, 0.2]</td></tr>
+    <tr><td><code>projected_gravity</code></td><td>3</td><td>重力方向在机体系中的投影，表征姿态</td><td>Uniform [-0.05, 0.05]</td></tr>
+    <tr><td><code>velocity_commands</code></td><td>3</td><td>目标 <code>vₓ</code>、<code>vᵧ</code>、<code>ωz</code></td><td>无</td></tr>
+    <tr><td><code>joint_pos</code></td><td>37</td><td>关节相对默认位置</td><td>Uniform [-0.01, 0.01]</td></tr>
+    <tr><td><code>joint_vel</code></td><td>37</td><td>关节相对速度</td><td>Uniform [-1.5, 1.5]</td></tr>
+    <tr><td><code>actions</code></td><td>37</td><td>上一步动作</td><td>无</td></tr>
+  </tbody>
+</table>
+<p>动作项为 <code>joint_pos</code>，维度 37；策略输出经 <code>scale=0.5</code> 缩放并以默认关节位置为 offset，得到目标关节位置。Play 配置关闭观测 corruption（G1 训练配置本未启用随机推搡，Play 变体中相应事件同样为空）。</p>
+
+<h3 class="section-sub"><span class="hnum">3.3</span>奖励函数</h3>
+<p>奖励在每个控制步按权重与控制步长累加。<strong>本实验的关键前提是这张表一项没改</strong>——三个条件都使用官方 G1 flat 的 16 个活跃奖励项（见表 4），主目标是线速度与 yaw 速度跟踪，双足步态项鼓励单支撑与摆脚，其余为稳定性与能耗正则。下文将说明：正是这张为 0–1.0 m/s 步行调好的奖励表，在命令范围扩大后无需任何修改就支撑出了 4 m/s 的奔跑步态。</p>
+<table>
+  <caption>表 4 · 奖励项与权重（官方 G1 flat 原表，三条件相同）</caption>
+  <thead><tr><th>奖励项</th><th>权重</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td><code>track_lin_vel_xy_exp</code></td><td>+1.0</td><td>指数核跟踪 xy 线速度命令</td></tr>
+    <tr><td><code>track_ang_vel_z_exp</code></td><td>+1.0</td><td>指数核跟踪 yaw 角速度命令</td></tr>
+    <tr><td><code>feet_air_time</code></td><td>+0.75</td><td>双足任务中鼓励非零命令下的单支撑/摆脚时间</td></tr>
+    <tr><td><code>termination_penalty</code></td><td>−200.0</td><td>提前失败终止重罚</td></tr>
+    <tr><td><code>flat_orientation_l2</code></td><td>−1.0</td><td>惩罚躯干偏离水平姿态</td></tr>
+    <tr><td><code>dof_pos_limits</code></td><td>−1.0</td><td>惩罚踝关节接近位置限位</td></tr>
+    <tr><td><code>feet_slide</code></td><td>−0.1</td><td>惩罚触地脚滑动</td></tr>
+    <tr><td><code>joint_deviation_hip / arms / fingers / torso</code></td><td>−0.1 / −0.1 / −0.05 / −0.1</td><td>限制髋偏航/滚转、手臂、手指与躯干偏离默认姿态</td></tr>
+    <tr><td><code>lin_vel_z_l2</code></td><td>−0.2</td><td>限制竖直方向速度</td></tr>
+    <tr><td><code>ang_vel_xy_l2</code></td><td>−0.05</td><td>限制横滚/俯仰角速度</td></tr>
+    <tr><td><code>action_rate_l2</code></td><td>−0.005</td><td>惩罚连续动作变化过大</td></tr>
+    <tr><td><code>dof_torques_l2 / dof_acc_l2</code></td><td>−2e−6 / −1e−7</td><td>惩罚髋/膝力矩与加速度</td></tr>
+  </tbody>
+</table>
+
+<h3 class="section-sub"><span class="hnum">3.4</span>终止与复位</h3>
+<p>终止条件包含 <code>time_out</code>（20 秒，即 1000 个控制步）与 <code>base_contact</code>（<code>torso_link</code> 接触力超阈值，表示摔倒或躯干触地）。复位时根位姿在 x/y/yaw 范围内随机化，关节以默认姿态复位；Play 任务关闭随机外力与观测噪声。三个条件的终止与复位设置相同——唯一区别仍是复位后每回合从各自的 <code>lin_vel_x</code> 范围采样命令。</p>
+
+<h3 class="section-sub"><span class="hnum">3.5</span>训练流程</h3>
+<p>每次迭代中，PPO 在 4096 个并行环境中各收集 24 个控制步，共 98,304 条 transition；随后以 4 个 mini-batch、5 个 learning epoch 更新 Actor-Critic。1500 次迭代对应约 1.47 亿控制步。两个扩展条件各训练 3 个随机种子（42/43/44）。</p>
+<div class="plist">
+  ${pr("num_envs", "4096", "官方配置；利用 GPU 并行物理提高采样吞吐。")}
+  ${pr("num_steps_per_env", "24", "G1 官方 RSL-RL 配置。")}
+  ${pr("max_iterations", "1500", "沿用 G1 flat 官方训练预算，与基线可比。")}
+  ${pr("seeds", "42 / 43 / 44", "每个扩展条件 3 个随机种子，末段统计取种子间 mean±std。")}
+</div>
+
+<h3 class="section-sub"><span class="hnum">3.6</span>环境与实验设置</h3>
+<p>任务以 Isaac Lab 的 Manager-based workflow 组织。本实验的自定义只有一处：一个继承官方 <code>G1FlatEnvCfg</code> 的配置子类，在 <code>__post_init__</code> 中覆盖前进速度命令范围，其余字段全部继承。核心差量如下（run2 条件；sprint4 条件仅范围上限改为 4.5）：</p>
+<pre>class G1FlatSpeedRun2Cfg(G1FlatEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()                                   # 先套用官方全部配置
+        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 2.2) # 唯一改动</pre>
+<p>软硬件环境与基线条件一致，只列版本：</p>
+<div class="plist">
+  ${kv("Isaac Lab", "isaaclab 0.54.3 · isaaclab_tasks 0.11.16 · Isaac Sim 5.1")}
+  ${kv("RSL-RL / PyTorch", "rsl-rl-lib 5.0.1 · torch 2.7.0+cu128")}
+  ${kv("GPU", "NVIDIA GeForce RTX 5070 Ti · driver 580.159.03")}
+  ${pr("learning_rate", "1e-3, adaptive", "官方 G1 PPO 配置；按 desired_kl=0.01 自适应。")}
+  ${pr("clip_param / gamma / lam", "0.2 / 0.99 / 0.95", "PPO 与 GAE 的官方通用设置。")}
+  ${pr("entropy_coef", "0.008", "沿用官方默认；本实验不改熵系数。")}
+  ${pr("actor_hidden_dims", "[256, 128, 128]", "G1 flat 官方策略网络宽度。")}
+</div>
+<p><strong>复现命令。</strong>训练走本仓自定义任务入口（在官方 train.py 基础上先注册自定义任务）：</p>
+<pre>TASK=G1-Flat-SpeedRun2-v0    scripts/train_custom.sh --seed 42 --run_name run2-s42       --logger wandb --log_project_name robot-learning-dashboard
+TASK=G1-Flat-SpeedSprint4-v0 scripts/train_custom.sh --seed 42 --run_name sprint4-s42 --logger wandb --log_project_name robot-learning-dashboard</pre>
+
+<h2 class="section-title"><span class="hnum">4</span>实验结果</h2>
+<p>6 个正式 run（run2 / sprint4 各 3 种子）的记录与训练耗时见表 5，全部完成 1500 次迭代并写出最终 checkpoint。两个条件的训练回报曲线如图 7 所示。</p>
+<table>
+  <caption>表 5 · 正式 run 清单</caption>
+  <thead><tr><th>条件</th><th>seed</th><th>公开标识</th><th>W&B</th><th>real time</th><th>末 100 回报</th></tr></thead>
+  <tbody>
+    <tr><td>run2</td><td>42</td><td><code>run2-s42</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/to21hu1f">to21hu1f</a></td><td>1289 s</td><td>21.08</td></tr>
+    <tr><td>run2</td><td>43</td><td><code>run2-s43</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/okkmk1u0">okkmk1u0</a></td><td>1314 s</td><td>22.14</td></tr>
+    <tr><td>run2</td><td>44</td><td><code>run2-s44</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/pis40k1k">pis40k1k</a></td><td>1339 s</td><td><strong>22.27</strong></td></tr>
+    <tr><td>sprint4</td><td>42</td><td><code>sprint4-s42</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/3357kqdu">3357kqdu</a></td><td>1315 s</td><td>8.19</td></tr>
+    <tr><td>sprint4</td><td>43</td><td><code>sprint4-s43</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/pk9sudvo">pk9sudvo</a></td><td>1301 s</td><td>6.40</td></tr>
+    <tr><td>sprint4</td><td>44</td><td><code>sprint4-s44</code></td><td><a href="https://wandb.ai/jeffliulab/robot-learning-dashboard/runs/5q42aiyw">5q42aiyw</a></td><td>1370 s</td><td>8.66</td></tr>
+  </tbody>
+</table>
+<figure class="chart-fig">
+<div data-rl-compare="locomotion/g1-speed-train"></div>
+<figcaption>图 7 · run2 与 sprint4 两条件的训练回报曲线（Train/mean_reward，6 个 run）。同条件同色、种子以线型区分；数据由本地 TensorBoard 事件文件导出，未作平滑或修饰。sprint4 的回报绝对值低于 run2，是因为更高速度命令下跟踪与稳定更难、正则惩罚更大，回报绝对值不可跨条件直接比较。</figcaption>
+</figure>
+<p>如图 7 所示，两个条件都在前若干百次迭代内进入稳定行走，随后回报缓慢上升；末段平均回合长度均接近 1000 步（run2 约 995、sprint4 约 989），说明两条件的多数回合都以 20 秒到时正常结束，而非中途摔倒终止——即便 sprint4 的命令范围高达 4.5 m/s。</p>
+
+<h2 class="section-title"><span class="hnum">5</span>实验分析</h2>
+<h3 class="section-sub"><span class="hnum">5.1</span>学习过程</h3>
+<p>两个条件的学习形态相似：前期先学会在宽速度谱上维持直立与基本迈步（回合长度快速上升到接近 1000 步），随后训练重点转向速度跟踪精度与动作平滑。差异主要体现在回报绝对水平——sprint4 末段回报（约 6.4–8.7）明显低于 run2（约 21.1–22.3），这不代表 sprint4 学得差，而是它被要求在最高 4.5 m/s 的命令上也跟踪与稳定，指数核跟踪奖励在高速误差下更难拿满、能耗与动作正则惩罚也更大。回合长度接近满值说明高回报差距来自"跟得多准"，而非"是否摔倒"。</p>
+<h3 class="section-sub"><span class="hnum">5.2</span>辅助指标</h3>
+<p>两个条件的回合长度末段都稳定在约 988–996 步（满值 1000），训练期 base_contact 终止比例很低；这与后文独立评估中两条件在各自范围内的速度命令下零摔倒一致。sprint4 的动作幅度与步频在训练后段随高速命令上升，是它在评估中于 4 m/s 呈现奔跑步态（步频约 3.7 Hz、带腾空相）的训练期先兆。</p>
+<h3 class="section-sub"><span class="hnum">5.3</span>多种子稳定性</h3>
+<p>每个扩展条件覆盖 3 个随机种子。run2 三种子末段回报为 21.83 ± 0.65，sprint4 为 7.75 ± 1.19；两条件的种子间方差都不大，回合长度高度一致，说明"扩大命令范围即可获得更高速度能力"不是单一 checkpoint 的偶然结果。sprint4 的种子间回报方差略大，与更宽命令范围下高速段的探索差异有关。</p>
+<h3 class="section-sub"><span class="hnum">5.4</span>策略行为</h3>
+<p>视频 1 展示 run2 条件（seed 42）在 2.0 m/s 命令下的 9.98 秒跟随镜头回放，视频 2 为同一策略把评估回合扩展到 60 秒的耐力回放（仅评估用，不改训练配置）。</p>
+<video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/g1-speed/range22-200cms-10s-poster.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-speed/range22-200cms-10s.mp4"></video>
+<video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/g1-speed/range22-200cms-endurance-60s-poster.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-speed/range22-200cms-endurance-60s.mp4"></video>
+<p>视频 3 展示 sprint4 条件（seed 42）在 4.0 m/s 命令下的奔跑；如图 8 所示，其抽帧序列中可见双脚同时离地的腾空相——这是步行与奔跑的运动学分界，也说明官方奖励表在未修改的情况下自发产生了奔跑步态。</p>
+<video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/g1-speed/range45-400cms-10s-poster.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-speed/range45-400cms-10s.mp4"></video>
+<figure>
+  <img src="assets/media/g1-speed/range45-400cms-10s-burst-10fps.jpg" width="3840" height="540" alt="4.0 m/s 奔跑抽帧连拍，可见双脚同时离地的腾空相">
+  <figcaption>图 8 · sprint4 条件 4.0 m/s 奔跑的抽帧连拍（约 1.6 秒、10 fps，共 16 帧）。序列中可见双脚同时离地的腾空相，与 1–2 m/s 时始终至少一脚触地的步态形成对比。独立评估测得该条件在 4.0 m/s 的双脚腾空占比为 20.2%。</figcaption>
+</figure>
+
+<h2 class="section-title"><span class="hnum">6</span>对比实验：命令范围如何决定速度能力</h2>
+<p>本节把三个条件放到同一组速度命令上直接对照，回答"扩大命令范围到底改变了什么"。实验设计见表 6：三个条件除 <code>lin_vel_x</code> 范围外完全一致，各在 1.0、2.0、4.0 m/s 三个固定前进命令上评估（每条件每速度 30 回合 = 3 种子 × 10 回合）。</p>
+<table>
+  <caption>表 6 · 对比实验设计。除 lin_vel_x 范围外，其余配置保持一致。</caption>
+  <thead><tr><th>条件</th><th>lin_vel_x 范围</th><th>Seeds</th><th>每 run 迭代</th><th>并行环境</th><th>奖励/观测/动作</th></tr></thead>
+  <tbody>
+    <tr><td>基线</td><td>(0, 1.0) 官方</td><td>42, 43, 44</td><td>1500</td><td>4096</td><td>不变</td></tr>
+    <tr><td>run2</td><td>(0, 2.2)</td><td>42, 43, 44</td><td>1500</td><td>4096</td><td>不变</td></tr>
+    <tr><td>sprint4</td><td>(0, 4.5)</td><td>42, 43, 44</td><td>1500</td><td>4096</td><td>不变</td></tr>
+  </tbody>
+</table>
+<p>核心对照是视频 4——其抽帧如图 9 所示——三个条件各在自己的展示速度上并排回放，速度差异一目了然：</p>
+<video width="1920" height="360" controls muted loop playsinline preload="metadata" poster="assets/media/g1-speed/speed-ladder-compare-10s-poster.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-speed/speed-ladder-compare-10s.mp4"></video>
+<figure>
+  <img src="assets/media/g1-speed/speed-ladder-compare-10s-poster.jpg" width="1920" height="360" alt="基线1.0 | run2 2.0 | sprint4 4.0 三画面并排">
+  <figcaption>图 9 · 速度阶梯三画面对照（视频 4 抽帧）：基线 @1.0 m/s 步行、run2 @2.0 m/s 快步、sprint4 @4.0 m/s 奔跑，三段同镜头、跟随拍摄。三者步频与步幅随速度递增，右格已出现明显前倾与腾空。</figcaption>
+</figure>
+<p>结果矩阵见表 7。<strong>关键对照是同一 2.0 m/s 命令下的基线与 run2</strong>：该速度落在基线训练范围（0–1.0）之外，基线三个种子中有两个（seed 42、43）10 回合全部摔倒、仅 seed 44 存活；而把范围扩到 0–2.2 的 run2 三个种子全部零摔、线速度 RMSE 仅 0.040 m/s。视频 5 把这组对照并排呈现，其失效过程如图 10 所示——左格基线策略在 2.0 m/s 命令下起步即失稳摔倒，右格 run2 在同一命令下稳定奔跑；这直观说明速度能力的边界由训练命令分布划定，而非机器人本体或奖励函数的硬限制。</p>
+<table>
+  <caption>表 7 · 三条件在 1/2/4 m/s 固定命令下的成功率与跟踪精度（每格 30 回合 = 3 种子 × 10）。线速度 RMSE 只统计未摔倒回合。</caption>
+  <thead><tr><th>条件＼命令</th><th>1.0 m/s</th><th>2.0 m/s</th><th>4.0 m/s</th></tr></thead>
+  <tbody>
+    <tr><td>基线 (0–1.0)</td><td>0 摔 · RMSE 0.117</td><td><strong>20/30 摔</strong>（2 种子整轮摔）</td><td>30/30 摔</td></tr>
+    <tr><td>run2 (0–2.2)</td><td>0 摔 · RMSE 0.041</td><td><strong>0 摔 · RMSE 0.040</strong></td><td>30/30 摔（范围外）</td></tr>
+    <tr><td>sprint4 (0–4.5)</td><td>0 摔 · RMSE 0.089</td><td>0 摔 · RMSE 0.060</td><td><strong>0 摔 · RMSE 0.080</strong>（腾空 20.2%）</td></tr>
+  </tbody>
+</table>
+<video width="1280" height="360" controls muted loop playsinline preload="metadata" poster="assets/media/g1-speed/range-boundary-200cms-compare-10s-poster.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-speed/range-boundary-200cms-compare-10s.mp4"></video>
+<figure>
+  <img src="assets/media/g1-speed/range10-200cms-fail-burst-1fps.jpg" width="2880" height="270" alt="官方范围基线在 2.0 米每秒命令下失稳摔倒的连拍">
+  <figcaption>图 10 · 官方范围基线（范围 0–1.0）在 2.0 m/s 命令下的失效连拍（约 6 秒、1 fps，共 6 帧）。命令超出训练范围后，基线策略无法产生足够快的步频，身体前倾后失稳，最终躯干触地终止（画面随后回到初始位置为评估环境的自动重置）。对照视频为并排双画面（实测 1280×360）、失效连拍为 6 帧拼接（实测 2880×270），二者的单机位源视频原生分辨率为 1280×720。</figcaption>
+</figure>
+<p>表 7 同时揭示了扩大范围的代价：sprint4 虽在 4.0 m/s 上稳定奔跑，但它在 1.0 m/s 上的跟踪 RMSE 为 0.089，高于把范围只扩到 0–2.2 的 run2（0.041）——极宽的命令范围把训练样本摊薄到 0–4.5 的整个速度谱，稀释了低速段的采样密度，低速跟踪精度因此下降。这是"训练分布决定行为质量"的另一面：范围不是越宽越好，应与目标速度区间匹配。run2 在 1.0 与 2.0 m/s 上都优于基线与 sprint4，是"范围恰好覆盖目标速度"时精度与能力兼得的例子。</p>
+
+<h2 class="section-title"><span class="hnum">7</span>独立评估</h2>
+<p>第 6 节的对照来自固定命令回放；本节用独立评估管线在统一考卷下量化三个条件的可靠性与跟踪精度。评估在去随机化的 Play 环境中进行，推理确定性（取动作分布均值），9 个策略（3 条件 × 3 种子）在每个命令点前重设同一评估种子、同卷可比；每轮 10 个并行环境同时执行；逐回合明细与聚合结果落盘为 CSV 与 JSON 并记录 checkpoint 与场景配置哈希。协议见表 8，合计 9 策略 × 50 回合 = 450 回合。</p>
+<table>
+  <caption>表 8 · 独立评估协议。三个固定速度点 + 两个耐力点，每点每策略 10 回合。</caption>
+  <thead><tr><th>场景</th><th>命令</th><th style="white-space:nowrap">回合 × 时长</th><th>检验目标</th></tr></thead>
+  <tbody>
+    <tr><td style="white-space:nowrap">固定网格</td><td>1.0 / 2.0 / 4.0 m/s 确定性前进</td><td style="white-space:nowrap">每点 10 × 20 s</td><td>各速度档的可靠性与跟踪精度</td></tr>
+    <tr><td style="white-space:nowrap">耐力</td><td>2.0 与 4.0 m/s 恒定前进</td><td style="white-space:nowrap">每点 10 × 60 s</td><td>高速档超过训练回合 3 倍时长的连续运行</td></tr>
+  </tbody>
+</table>
+<p>指标口径与基线条件一致：速度跟踪误差为基座系下水平速度误差的 L2 范数、对有效步取时间平均（剔除起步 1 秒稳定期与终止边界步，摔倒后数据不计）；可靠性主指标为摔倒回合数与成功率（摔倒 = 躯干触地终止）；步态量化按左右脚分别统计单步腾空时长、触地交替率与双脚同时离地占比（<code>flight_fraction</code>，奔跑步态该值显著为正）。核心结果见表 9。</p>
+<table>
+  <caption>表 9 · 独立评估核心结果。数值为 3 个训练种子的 mean±std（ddof=1）；跟踪 RMSE 只统计未摔倒回合，单位 m/s；每条件每命令点 30 回合。</caption>
+  <thead><tr><th>命令</th><th>指标</th><th>基线 (0–1.0)</th><th>run2 (0–2.2)</th><th>sprint4 (0–4.5)</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="2">1.0 m/s</td><td>成功率</td><td>1.000</td><td>1.000</td><td>1.000</td></tr>
+    <tr><td>线速度 RMSE</td><td>0.117 ± 0.024</td><td><strong>0.041 ± 0.009</strong></td><td>0.089 ± 0.038</td></tr>
+    <tr><td rowspan="3">2.0 m/s</td><td>成功率</td><td>0.333（2 种子整轮摔）</td><td><strong>1.000</strong></td><td><strong>1.000</strong></td></tr>
+    <tr><td>摔倒数（/30）</td><td>20</td><td>0</td><td>0</td></tr>
+    <tr><td>线速度 RMSE</td><td>0.179（幸存种子）</td><td><strong>0.040 ± 0.002</strong></td><td>0.060 ± 0.015</td></tr>
+    <tr><td rowspan="4">4.0 m/s</td><td>成功率</td><td>0.000</td><td>0.000（范围外）</td><td><strong>1.000</strong></td></tr>
+    <tr><td>摔倒数（/30）</td><td>30</td><td>30</td><td><strong>0</strong></td></tr>
+    <tr><td>线速度 RMSE</td><td>—</td><td>—</td><td><strong>0.080 ± 0.009</strong></td></tr>
+    <tr><td>双脚腾空占比</td><td>—</td><td>—</td><td>0.202 ± 0.014</td></tr>
+    <tr><td rowspan="2">耐力 60 s</td><td>@2.0 摔倒（/30）</td><td>20</td><td><strong>0</strong></td><td><strong>0</strong></td></tr>
+    <tr><td>@4.0 摔倒（/30）</td><td>30</td><td>30</td><td><strong>0</strong></td></tr>
+  </tbody>
+</table>
+<p>表 9 给出三条一致的结论。第一，<strong>命令范围决定可用速度上限</strong>：基线（0–1.0）只在 1.0 m/s 可靠，2.0 m/s 三种子中两个整轮摔倒、4.0 m/s 全摔；run2（0–2.2）把可靠上限推到 2.0 m/s（三种子零摔、RMSE 0.040）；sprint4（0–4.5）进一步在 4.0 m/s 三种子零摔。每个条件都在其范围内可靠、范围外迅速失效，可用速度与训练范围的对应关系清晰。第二，<strong>4.0 m/s 是真正的奔跑而非快走</strong>：sprint4 在该速度的双脚腾空占比达 20.2%，60 秒耐力回合同样零摔且维持相同腾空比例——奔跑步态是稳定持续的，不是短暂现象。第三，<strong>精度与范围需匹配</strong>：run2 在 1.0 与 2.0 m/s 的跟踪都优于其余条件，而 sprint4 因范围极宽在 1.0 m/s 上精度下降（RMSE 0.089 对 run2 的 0.041）。</p>
+<p>视频 6 为 sprint4 在 4.0 m/s 命令下的 60 秒耐力回放：全程零摔并维持带腾空相的奔跑步态，说明上述"稳定持续"并非短时现象，而是可长时间保持的行为。</p>
+<video width="1280" height="720" controls muted loop playsinline preload="metadata" poster="assets/media/g1-speed/range45-400cms-endurance-60s-poster.jpg" style="width:100%;border:1px solid var(--rule);border-radius:8px" src="assets/media/g1-speed/range45-400cms-endurance-60s.mp4"></video>
+<p>最值得强调的是：<strong>上述奔跑步态是在奖励表一项未改的情况下自发出现的</strong>。官方 G1 flat 的奖励只要求跟踪速度命令、不摔倒并满足若干正则，其中并没有"进入奔跑"或"产生腾空相"的显式项。当命令速度被提高到 4 m/s 时，策略发现带腾空相的奔跑是同时满足高速跟踪与省力正则的解，于是自行采用——这与显式奖励某种步态形状（后者容易被策略以表面达标的退化解利用）是相反的路径：在本实验中，通过在命令分布上做文章诱导出的奔跑，既满足高速跟踪又保持了达标的可靠性，未出现为迎合奖励而牺牲步态的退化解。</p>
+
+<h2 class="section-title"><span class="hnum">8</span>局限性</h2>
+<p>第一，本实验只覆盖仿真平地，无外力扰动、地形、传感噪声或 sim-to-real 随机化。第二，评估使用单一评估种子（为 9 策略同卷可比而固定），靠每命令点 30 回合摊薄，未做多评估种子稳定性检验。第三，宽命令范围以牺牲低速段样本密度为代价，sprint4 在 1.0 m/s 上的跟踪精度不及范围较窄的 run2；本实验也未评估更自然的步态质量，只报告了可靠性与跟踪误差。第四，速度阶梯只取了 1/2/4 三档，未系统扫描"范围上限—可达速度"的关系曲线，也未定位官方奖励表失效的确切速度上限（4.5 m/s 范围已能稳定跑到 4.0 m/s，更高速度未测）。第五，评估只在纯前进命令下进行，未覆盖高速与转向、横移同时下达的复合命令。</p>
+
+<h2 class="section-title"><span class="hnum">9</span>结论与未来工作</h2>
+<p>本实验通过仅覆盖前进速度命令范围一项，得到从步行到奔跑的速度阶梯：run2 把可靠速度上限从官方的 1.0 提升到 2.0 m/s（三种子零摔、RMSE 0.040），sprint4 进一步在 4.0 m/s 实现三种子零摔的奔跑（腾空占比 20.2%、60 秒耐力零摔）。核心结论是——在保持官方奖励、观测、网络与超参数完全不变的前提下，机器人的前进速度能力主要由训练命令分布决定，官方为步行调好的奖励表足以支撑到 4 m/s 的奔跑，且带腾空相的奔跑步态是速度提高后自发涌现的，而非被显式奖励塑形。这为后续工作提供了一个稳健的调节手段：与其为新行为手工设计奖励项，不如先检验能否通过调整任务/命令分布达成。未来工作包括系统扫描命令范围上限与可达速度的关系、在扩展速度上加入地形与扰动，以及把高速策略纳入统一评估考卷的抗扰动专项。</p>
+
+<h2 class="section-title appendix">附录 · 关于本报告</h2>
+<p><strong>数据来源。</strong>任务与 PPO 配置读取自 Isaac Lab 官方 G1 flat 配置与本实验的自定义子类；曲线与表格统计来自 6 个正式 run 的本地 TensorBoard 事件文件，末段口径为最后 100 迭代种子间 mean±std（ddof=1）；参数量读自最终 checkpoint；视频与抽帧来自各条件的跟随镜头 Play 回放。第 6、7 节的评估数字来自代码仓评估管线的落盘产物（每回合明细 CSV 共 450 回合，聚合 JSON 记录 checkpoint 与场景配置的 SHA-256 哈希、Isaac Lab 版本与代码 git 提交号），摔倒计数经"CSV 逐行计数"与"聚合脚本"两条独立路径对账一致。</p>
+<p><strong>报告产物。</strong>训练曲线、对比曲线、回放与对照视频、抽帧均随页面仓库提供；跟随镜头回放脚本为 <code>scripts/play_follow_camera.py</code>，评估管线为代码仓 <code>eval/</code> 目录（声明式场景 YAML + 采集/聚合两段式脚本）。</p>
+<p><strong>参考文献。</strong></p>
+<ol>
+  <li>J. Schulman, F. Wolski, P. Dhariwal, A. Radford, O. Klimov. <em>Proximal Policy Optimization Algorithms</em>. arXiv:1707.06347, 2017.</li>
+  <li>J. Schulman, P. Moritz, S. Levine, M. Jordan, P. Abbeel. <em>High-Dimensional Continuous Control Using Generalized Advantage Estimation</em>. arXiv:1506.02438, 2015.</li>
+  <li>N. Rudin, D. Hoeller, P. Reist, M. Hutter. <em>Learning to Walk in Minutes Using Massively Parallel Deep Reinforcement Learning</em>. CoRL 2021.</li>
+  <li>Isaac Lab Project Developers. <em>Isaac Lab</em>, official manager-based locomotion velocity tasks and Unitree G1 configuration.</li>
+</ol>
+`;

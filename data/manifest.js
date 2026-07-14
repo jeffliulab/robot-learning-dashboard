@@ -53,6 +53,12 @@ window.RL_TREE = {
               algo: "PPO", sim: "Isaac Lab",
               status: "done", date: "2026-07-10",
               blurb: "Isaac-Velocity-Flat-G1-v0 官方任务的 2 条件 × 3 种子训练记录：默认 entropy=0.008 与 entropy=0.005 对照，含跟随镜头回放、导出策略与 7,800 回合独立评估（固定网格/随机命令/耐力/命令切换）。"
+            },
+            {
+              id: "g1-speed", title: "G1 速度阶梯", robot: "G1", route: "RL",
+              algo: "PPO", sim: "Isaac Lab",
+              status: "done", date: "2026-07-14",
+              blurb: "只改一项命令范围 lin_vel_x，把 G1 从 1 m/s 步行训到 4 m/s 奔跑：范围 0–2.2 在 2.0 m/s 三种子零摔（官方范围基线 2/3 种子全摔），范围 0–4.5 在 4.0 m/s 三种子零摔、腾空占比 20%（未改奖励表即自发奔跑）。含三画面速度阶梯对比视频、边界失效对照与 450 回合独立评估。"
             }
           ]
         },
