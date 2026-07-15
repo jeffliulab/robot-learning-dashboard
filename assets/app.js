@@ -230,9 +230,11 @@
   }
 
   /* ---------- 图放大浮窗（lightbox）----------
-     正文 <figure> 直接子级的 SVG（示意图类）点击放大：SVG 矢量无损，正合适。
-     选择器必须是 figure > svg（直接子元素）——plotly 曲线图的 svg 嵌在多层 div 里，
-     天然被排除；曲线自带悬浮/框选交互，绝不能被 lightbox 劫持点击。
+     正文 <figure> 里的 SVG 示意图与图片点击放大：
+       · SVG 必须是 figure > svg（直接子元素）——plotly 曲线图的 svg 嵌在多层 div 里，
+         天然被排除；曲线自带悬浮/框选交互，绝不能被 lightbox 劫持点击。
+       · 图片匹配 figure img（宽幅抽帧/对照海报），点击放大到贴合视口；克隆后清掉行内
+         width/height 属性，交给 .lightbox-inner img 的 CSS 按纵横比铺满。
      事件委托绑在 document 上，路由重渲染后依然有效。 */
   function initLightbox() {
     var box = null;
@@ -245,11 +247,18 @@
     document.addEventListener("click", function (ev) {
       if (box) return;                                  // 浮窗打开期间由浮窗自己处理
       var t = ev.target;
-      var svg = t && t.closest ? t.closest("figure > svg") : null;
-      if (!svg || !svg.closest("#view")) return;        // 只作用于正文示意图
-      var fig = svg.closest("figure");
+      if (!t || !t.closest) return;
+      var media = t.closest("figure > svg, figure img");
+      if (!media || !media.closest("#view")) return;    // 只作用于正文的图
+      var node = media.cloneNode(true);
+      if (media.tagName && media.tagName.toLowerCase() === "img") {
+        node.removeAttribute("width");                  // 去掉行内尺寸，交给 lightbox CSS 铺满视口
+        node.removeAttribute("height");
+        node.removeAttribute("style");
+      }
+      var fig = media.closest("figure");
       var cap = fig ? fig.querySelector("figcaption") : null;
-      var inner = h("div", { class: "lightbox-inner" }, [svg.cloneNode(true)]);
+      var inner = h("div", { class: "lightbox-inner" }, [node]);
       if (cap) inner.appendChild(h("div", { class: "lightbox-cap", html: cap.innerHTML }));
       box = h("div", { class: "lightbox", role: "dialog", "aria-label": "放大查看图片" }, [inner]);
       box.addEventListener("click", close);             // 点任意处关闭

@@ -109,6 +109,9 @@ h1.page-h1{font-family:var(--serif);font-size:40px;line-height:1.14;letter-spaci
 
 /* ---------- 图 ---------- */
 figure{margin:26px 0;text-align:center;} figure svg{max-width:100%;height:auto;}
+/* 正文 <figure> 内的图片一律收进正文宽度（宽幅抽帧/对照海报的原生像素常远大于版心，
+   不限制会溢出版心/撑破布局）；width/height 属性仍保留以提供纵横比、稳定占位、防加载跳版。*/
+figure img{max-width:100%;height:auto;}
 figcaption{font-family:var(--serif);font-style:italic;font-size:13.5px;color:var(--ink-3);margin-top:12px;}
 /* 表标题：语义化 <caption>，置于表上方（论文惯例） */
 #view table caption{caption-side:top;font-family:var(--serif);font-style:italic;font-size:13.5px;color:var(--ink-3);text-align:center;padding:6px 0 8px;}
@@ -119,13 +122,16 @@ figcaption{font-family:var(--serif);font-style:italic;font-size:13.5px;color:var
 /* 网络架构图（RLNet 组件，viewBox 1180 宽）：画布比普通示意图宽，字号补偿一档，缩略状态仍可读 */
 svg.net .lb{font-size:16px;} svg.net .sb{font-size:14px;}
 
-/* ---------- 图放大浮窗（lightbox）：正文示意图 SVG 点击放大 ---------- */
-figure > svg{cursor:zoom-in;}
+/* ---------- 图放大浮窗（lightbox）：正文示意图 SVG 与图片点击放大 ---------- */
+figure > svg, figure img{cursor:zoom-in;}
 .lightbox{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
   padding:28px;cursor:zoom-out;background:color-mix(in srgb,var(--paper) 86%,transparent);backdrop-filter:blur(7px);}
 .lightbox-inner{max-width:min(94vw,1400px);max-height:92vh;overflow:auto;text-align:center;}
 .lightbox-inner svg{width:min(94vw,1400px);height:auto;background:var(--card);
   border:1px solid var(--rule);border-radius:12px;padding:26px;}
+/* 图片放大：贴合视口取较大边，宽幅图也不溢出；height:auto 保纵横比 */
+.lightbox-inner img{max-width:min(94vw,1400px);max-height:88vh;width:auto;height:auto;background:var(--card);
+  border:1px solid var(--rule);border-radius:12px;padding:10px;}
 .lightbox-cap{font-family:var(--serif);font-style:italic;font-size:14.5px;color:var(--ink-2);
   margin:12px auto 0;max-width:84ch;}
 
